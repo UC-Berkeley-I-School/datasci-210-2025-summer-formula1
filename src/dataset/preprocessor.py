@@ -1,9 +1,10 @@
 import fastf1.core
+import pandas as pd
+import numpy as np
 from pandas import DataFrame
-from typing import Tuple
+from typing import Tuple, Dict, Any, Optional
 from enum import Enum
 from dataclasses import dataclass
-import fastf1
 
 class BaseFeatures(Enum):
     DRIVER = 'Driver'
@@ -12,285 +13,359 @@ class BaseFeatures(Enum):
     COMPOUND = 'Compound'
 
 
-def create_high_freq_dataset(session: fastf1.core.Session, interval_seconds: int = 1.0) -> DataFrame:
+@dataclass
+class PreprocessorConfig:
+    """Configuration for the F1 dataset preprocessor"""
+
+    interval_seconds: float = 1.0
+    balance_features: list["BaseFeatures"] = None
+    balance_method: str = "remove_insufficient"
+    min_samples: int = 1000
+    target_samples: Optional[int] = None
+    include_track_status: bool = True
+    include_event_info: bool = True
+
+    def __post_init__(self):
+        if self.balance_features is None:
+            self.balance_features = [BaseFeatures.DRIVER, BaseFeatures.SAFETY_CAR]
+
+
+class F1DatasetPreprocessor:
     """
-    Create high-frequency dataset with fixed time intervals using session time
+    Efficient F1 dataset preprocessor that minimizes redundant operations
+    and memory usage for time series classification tasks.
     """
-    laps_df = session.laps
 
-    # work with session timedeltas
-    session_start = laps_df['LapStartTime'].min()
-    session_end = laps_df['Time'].max()
+    def __init__(self, config: PreprocessorConfig = None):
+        self.config = config or PreprocessorConfig()
+        self._session_cache = {}
 
-    # create time grid as seconds from session start
-    start_seconds = session_start.total_seconds()
-    end_seconds = session_end.total_seconds()
+    def process_dataset(self, session: fastf1.core.Session) -> DataFrame:
+        """
+        Main processing pipeline that efficiently applies all transformations.
+        """
+        if not session:
+            raise ValueError("session must be defined")
 
-    time_grid_seconds = np.arange(start_seconds, end_seconds, interval_seconds)
+        if self.config.interval_seconds <= 0:
+            raise ValueError("interval_seconds must be positive")
 
-    all_driver_data = []
+        # Single-pass processing with all transformations
+        return self._process_single_pass(session)
 
-    for driver in laps_df['Driver'].unique():
-        driver_laps = laps_df[laps_df['Driver'] == driver].copy()
-        driver_telemetry = []
+    def _process_single_pass(self, session: fastf1.core.Session) -> DataFrame:
+        """
+        Single-pass processing that combines all transformation steps.
+        """
+        # Pre-fetch and cache all session data once
+        session_data = self._extract_session_data(session)
+
+        # Create time grid
+        time_grid = self._create_time_grid(session_data["laps"])
+
+        # Process all drivers in single loop
+        all_records = []
+        for driver in session_data["laps"]["Driver"].unique():
+            driver_records = self._process_driver_telemetry(
+                driver, session_data, time_grid
+            )
+            all_records.extend(driver_records)
+
+        # Convert to DataFrame once
+        df = pd.DataFrame(all_records)
+
+        if df.empty:
+            return df
+
+        # Apply balancing if requested
+        if self.config.balance_features:
+            df = self._balance_features(df)
+
+        return df
+
+    def _extract_session_data(self, session: fastf1.core.Session) -> Dict[str, Any]:
+        """
+        Extract and cache all required session data in a single operation.
+        """
+        session_id = id(session)
+        if session_id in self._session_cache:
+            return self._session_cache[session_id]
+
+        data = {"laps": session.laps, "track_status": None, "event_info": None}
+
+        # Extract track status if needed
+        if self.config.include_track_status:
+            track_status = session.track_status.copy()
+            track_status["StatusTimeSeconds"] = track_status["Time"].dt.total_seconds()
+            track_status = track_status.sort_values("StatusTimeSeconds").reset_index(
+                drop=True
+            )
+            data["track_status"] = track_status
+
+        # Extract event info if needed
+        if self.config.include_event_info:
+            session_info = session.session_info
+            data["event_info"] = {
+                "session_name": session_info.get("Meeting", {}).get("Name", "Unknown"),
+                "country": session_info.get("Meeting", {})
+                .get("Country", {})
+                .get("Name", "Unknown"),
+                "session_type": session_info.get("Type", "Unknown"),
+                "start_date": session_info.get("StartDate"),
+                "location": session_info.get("Meeting", {}).get("Location", "Unknown"),
+            }
+
+        self._session_cache[session_id] = data
+        return data
+
+    def _create_time_grid(self, laps_df: DataFrame) -> np.ndarray:
+        """Create time grid for temporal alignment."""
+        session_start = laps_df["LapStartTime"].min()
+        session_end = laps_df["Time"].max()
+
+        start_seconds = session_start.total_seconds()
+        end_seconds = session_end.total_seconds()
+
+        return np.arange(start_seconds, end_seconds, self.config.interval_seconds)
+
+    def _process_driver_telemetry(
+        self, driver: str, session_data: Dict, time_grid: np.ndarray
+    ) -> list:
+        """
+        Process telemetry for a single driver, creating records aligned to time grid.
+        """
+        driver_laps = session_data["laps"][session_data["laps"]["Driver"] == driver]
+        records = []
 
         for _, lap in driver_laps.iterrows():
             try:
-                # get telemtry for this lap
+                # Get telemetry data for this lap
                 car_data = lap.get_car_data()
                 pos_data = lap.get_pos_data()
                 weather_data = lap.get_weather_data()
-                
-                # Convert SessionTime to seconds for easier indexing
-                if not car_data.empty:
-                    car_data = car_data.copy()
-                    car_data['SessionSeconds'] = car_data['SessionTime'].dt.total_seconds()
-                    
+
+                if car_data.empty:
+                    continue
+
+                # Convert to seconds for alignment
+                car_data = car_data.copy()
+                car_data["SessionSeconds"] = car_data["SessionTime"].dt.total_seconds()
+
                 if not pos_data.empty:
                     pos_data = pos_data.copy()
-                    pos_data['SessionSeconds'] = pos_data['SessionTime'].dt.total_seconds()
-                
-                lap_static = {
-                    'Driver': driver,
-                    'LapNumber': lap['LapNumber'],
-                    'Compound': lap['Compound'],
-                    'TyreLife': lap['TyreLife'],
-                    'AirTemp': weather_data['AirTemp'] if pd.notna(weather_data['AirTemp']) else None,
-                    'TrackTemp': weather_data['TrackTemp'] if pd.notna(weather_data['TrackTemp']) else None,
-                    'Humidity': weather_data['Humidity'] if pd.notna(weather_data['Humidity']) else None,
+                    pos_data["SessionSeconds"] = pos_data[
+                        "SessionTime"
+                    ].dt.total_seconds()
+
+                # Create base lap info
+                lap_info = {
+                    "Driver": driver,
+                    "LapNumber": lap["LapNumber"],
+                    "Compound": lap["Compound"],
+                    "TyreLife": lap["TyreLife"],
+                    "AirTemp": (
+                        weather_data.get("AirTemp")
+                        if pd.notna(weather_data.get("AirTemp"))
+                        else None
+                    ),
+                    "TrackTemp": (
+                        weather_data.get("TrackTemp")
+                        if pd.notna(weather_data.get("TrackTemp"))
+                        else None
+                    ),
+                    "Humidity": (
+                        weather_data.get("Humidity")
+                        if pd.notna(weather_data.get("Humidity"))
+                        else None
+                    ),
                 }
-                
-                driver_telemetry.append({
-                    'car_data': car_data,
-                    'pos_data': pos_data,
-                    'lap_static': lap_static,
-                    'lap_start_seconds': lap['LapStartTime'].total_seconds(),
-                    'lap_end_seconds': lap['Time'].total_seconds()
-                })
-            
+
+                # Add event info if enabled
+                if self.config.include_event_info and session_data["event_info"]:
+                    lap_info.update(session_data["event_info"])
+
+                # Align telemetry to time grid
+                lap_start = lap["LapStartTime"].total_seconds()
+                lap_end = lap["Time"].total_seconds()
+
+                # Find relevant time grid points for this lap
+                lap_grid_mask = (time_grid >= lap_start) & (time_grid <= lap_end)
+                lap_time_points = time_grid[lap_grid_mask]
+
+                # Create record for each time point in this lap
+                for time_point in lap_time_points:
+                    record = lap_info.copy()
+                    record["SessionTimeSeconds"] = time_point
+
+                    # Interpolate telemetry data to this time point
+                    self._add_telemetry_at_time(record, car_data, pos_data, time_point)
+
+                    # Add track status if enabled
+                    if self.config.include_track_status:
+                        self._add_track_status_at_time(
+                            record, session_data["track_status"], time_point
+                        )
+
+                    records.append(record)
+
             except Exception as e:
                 print(f"Skipping lap {lap['LapNumber']} for {driver}: {e}")
                 continue
-        
-        # Align to time grid for this driver
-        driver_grid_data = align_to_time_grid(driver_telemetry, time_grid_seconds)
-        all_driver_data.append(driver_grid_data)
-    
-    # Combine all drivers
-    final_df = pd.concat(all_driver_data, ignore_index=True)
-    return final_df
 
+        return records
 
-def balance_dataset_by_feature(dataset: DataFrame, features: list[BaseFeatures], method='remove_insufficient', min_samples: int = 1000) -> DataFrame:
-    """
-    Balance dataset by multiple features using specified strategy.
-    
-    Args:
-        dataset: Input DataFrame
-        features: List of BaseFeatures to balance on
-        method: Balancing strategy ('remove_insufficient', 'undersample_to_min', 'undersample_to_target', 'keep_all')
-        min_samples: Minimum samples threshold for balancing decisions
-    
-    Returns:
-        Balanced DataFrame
-    """
-    if not features:
-        return dataset.copy()
-    
-    # Convert enum values to column names
-    feature_cols = [feature.value for feature in features]
-    
-    # Create combination groups for all specified features
-    if len(feature_cols) == 1:
-        combo_col = feature_cols[0]
-        dataset_copy = dataset.copy()
-    else:
-        # Create combined feature column for multi-feature balancing
-        combo_col = 'FeatureCombination'
-        dataset_copy = dataset.copy()
-        dataset_copy[combo_col] = dataset_copy[feature_cols].apply(
-            lambda row: '_'.join(str(val) for val in row), axis=1
-        )
-    
-    # Get combination counts
-    combo_counts = dataset_copy[combo_col].value_counts()
-    print(f"Original {'/'.join(feature_cols)} distribution:")
-    print(combo_counts)
-    
-    if method == 'remove_insufficient':
-        # Remove combinations with insufficient data
-        sufficient_combos = combo_counts[combo_counts >= min_samples].index
-        balanced_df = dataset_copy[dataset_copy[combo_col].isin(sufficient_combos)].copy()
-        removed_combos = set(combo_counts.index) - set(sufficient_combos)
-        if removed_combos:
-            print(f"\nRemoved combinations with < {min_samples} samples: {removed_combos}")
-        
-    elif method == 'undersample_to_min':
-        # Undersample all combinations to match smallest viable class
-        viable_combos = combo_counts[combo_counts >= min_samples]
-        if viable_combos.empty:
-            print(f"No combinations have >= {min_samples} samples. Returning empty DataFrame.")
-            return DataFrame()
-        
-        min_viable_count = viable_combos.min()
-        balanced_dfs = []
-        
-        for combo in viable_combos.index:
-            combo_data = dataset_copy[dataset_copy[combo_col] == combo]
-            sampled_data = combo_data.sample(n=min_viable_count, random_state=42)
-            balanced_dfs.append(sampled_data)
-        
-        balanced_df = pd.concat(balanced_dfs, ignore_index=True)
-        print(f"\nUndersampled all viable combinations to {min_viable_count} samples each")
-        
-    elif method == 'undersample_to_target':
-        # Undersample to target amount (default 3000)
-        target_samples = 3000
-        viable_combos = combo_counts[combo_counts >= min_samples]
-        
-        balanced_dfs = []
-        for combo in viable_combos.index:
-            combo_data = dataset_copy[dataset_copy[combo_col] == combo]
-            sample_size = min(len(combo_data), target_samples)
-            sampled_data = combo_data.sample(n=sample_size, random_state=42)
-            balanced_dfs.append(sampled_data)
-        
-        balanced_df = pd.concat(balanced_dfs, ignore_index=True)
-        print(f"\nSampled combinations to max {target_samples} samples each")
-        
-    elif method == 'keep_all':
-        # Keep all combinations but flag the imbalance
-        balanced_df = dataset_copy.copy()
-        print(f"\nKept all combinations (imbalance preserved)")
-        
-    else:
-        raise ValueError(f"Unknown method: {method}")
-    
-    # Clean up temporary combination column if created
-    if len(feature_cols) > 1 and combo_col in balanced_df.columns:
-        balanced_df = balanced_df.drop(columns=[combo_col])
-    
-    print(f"\nFinal dataset shape: {balanced_df.shape}")
-    print("Final distribution:")
-    
-    # Show final distribution for each feature
-    for feature_col in feature_cols:
-        if feature_col in balanced_df.columns:
-            print(f"{feature_col}:")
-            print(balanced_df[feature_col].value_counts().sort_values(ascending=False))
-            print()
-    
-    return balanced_df
+    def _add_telemetry_at_time(
+        self, record: dict, car_data: DataFrame, pos_data: DataFrame, time_point: float
+    ):
+        """Add interpolated telemetry data to record at specific time point."""
+        # Find closest telemetry point
+        if not car_data.empty:
+            time_diffs = np.abs(car_data["SessionSeconds"] - time_point)
+            closest_idx = time_diffs.idxmin()
+            closest_car = car_data.loc[closest_idx]
 
+            # Add car telemetry
+            record.update(
+                {
+                    "Speed": closest_car.get("Speed"),
+                    "RPM": closest_car.get("RPM"),
+                    "Gear": closest_car.get("nGear"),
+                    "Throttle": closest_car.get("Throttle"),
+                    "Brake": closest_car.get("Brake"),
+                    "DRS": closest_car.get("DRS"),
+                }
+            )
 
-def add_track_status_labels(dataset: DataFrame, session: fastf1.core.Session) -> DataFrame:
-    """
-    Add track status labels to the dataset based on session track status
-    """
-    # Get track status data
-    track_status_df = session.track_status.copy()
-    
-    # Convert track status times to seconds
-    track_status_df['StatusTimeSeconds'] = track_status_df['Time'].dt.total_seconds()
-    
-    # Sort by time to ensure proper forward-fill logic
-    track_status_df = track_status_df.sort_values('StatusTimeSeconds').reset_index(drop=True)
-    
-    print("Track status changes:")
-    print(track_status_df[['StatusTimeSeconds', 'Status', 'Message']])
-    
-    # Add track status to dataset
-    dataset_with_status = dataset.copy()
-    dataset_with_status['TrackStatus'] = None
-    dataset_with_status['TrackStatusMessage'] = None
-    
-    # For each row, find the most recent track status
-    for idx, row in dataset_with_status.iterrows():
-        session_time = row['SessionTimeSeconds']
-        
-        # Find the most recent status change before or at this time
-        valid_statuses = track_status_df[track_status_df['StatusTimeSeconds'] <= session_time]
-        
+        # Add position data if available
+        if not pos_data.empty:
+            pos_time_diffs = np.abs(pos_data["SessionSeconds"] - time_point)
+            closest_pos_idx = pos_time_diffs.idxmin()
+            closest_pos = pos_data.loc[closest_pos_idx]
+
+            record.update(
+                {
+                    "X": closest_pos.get("X"),
+                    "Y": closest_pos.get("Y"),
+                    "Z": closest_pos.get("Z"),
+                }
+            )
+
+    def _add_track_status_at_time(
+        self, record: dict, track_status: DataFrame, time_point: float
+    ):
+        """Add track status information at specific time point."""
+        if track_status is None or track_status.empty:
+            record.update(
+                {"TrackStatus": "1", "TrackStatusMessage": "AllClear", "SafetyCar": 0}
+            )
+            return
+
+        # Find most recent track status change
+        valid_statuses = track_status[track_status["StatusTimeSeconds"] <= time_point]
+
         if not valid_statuses.empty:
             latest_status = valid_statuses.iloc[-1]
-            dataset_with_status.at[idx, 'TrackStatus'] = latest_status['Status']
-            dataset_with_status.at[idx, 'TrackStatusMessage'] = latest_status['Message']
+            record.update(
+                {
+                    "TrackStatus": latest_status["Status"],
+                    "TrackStatusMessage": latest_status["Message"],
+                    "SafetyCar": 1 if latest_status["Status"] == "4" else 0,
+                }
+            )
         else:
-            # If no status change has occurred yet, assume normal conditions
-            dataset_with_status.at[idx, 'TrackStatus'] = '1'  # AllClear
-            dataset_with_status.at[idx, 'TrackStatusMessage'] = 'AllClear'
-    
-    # Create binary safety car label
-    dataset_with_status['SafetyCar'] = (dataset_with_status['TrackStatus'] == '4').astype(int)
-    
-    print(f"\nTrack status distribution:")
-    print(dataset_with_status['TrackStatusMessage'].value_counts())
-    print(f"\nSafety car samples: {dataset_with_status['SafetyCar'].sum()}")
-    print(f"Total samples: {len(dataset_with_status)}")
-    print(f"Safety car percentage: {dataset_with_status['SafetyCar'].mean():.2%}")
-    
-    return dataset_with_status
+            record.update(
+                {"TrackStatus": "1", "TrackStatusMessage": "AllClear", "SafetyCar": 0}
+            )
 
-def add_event_info_columns(dataset: DataFrame, session: fastf1.core.Session) -> DataFrame:
-    """
-    Add event identification columns to the dataset for multi-race aggregation.
-    
-    Args:
-        labeled_dataset (pd.DataFrame): F1 telemetry dataset
-        session: FastF1 session object with session_info attribute
-    
-    Returns:
-        pd.DataFrame: Dataset with added event columns
-    """
-    # Extract session info
-    session_info = session.session_info
-    
-    # Extract the required fields
-    session_name = session_info.get('Meeting', {}).get('Name', 'Unknown')  # e.g., 'Saudi Arabian Grand Prix'
-    country_name = session_info.get('Meeting', {}).get('Country', {}).get('Name', 'Unknown')  # e.g., 'Saudi Arabia'
-    session_type = session_info.get('Type', 'Unknown')  # e.g., 'Race'
-    
-    # Create a copy of the dataset to avoid modifying original
-    enhanced_dataset = labeled_dataset.copy()
-    
-    # Add event identification columns
-    enhanced_dataset['SessionName'] = session_name  
-    enhanced_dataset['Country'] = country_name
-    enhanced_dataset['SessionType'] = session_type
-    
-    # Optional: Add additional useful fields
-    enhanced_dataset['StartDate'] = session_info.get('StartDate')
-    enhanced_dataset['Location'] = session_info.get('Meeting', {}).get('Location', 'Unknown')
-    
-    print(f"Added event info columns:")
-    print(f"  Session: {session_name}")
-    print(f"  Country: {country_name}")
-    print(f"  Session Type: {session_type}")
-    print(f"  Location: {enhanced_dataset['Location'].iloc[0]}")
-    
-    return enhanced_dataset
+    def _balance_features(self, df: DataFrame) -> DataFrame:
+        """Apply feature balancing using the existing logic."""
+        feature_cols = [feature.value for feature in self.config.balance_features]
+
+        # Create combination column for multi-feature balancing
+        if len(feature_cols) == 1:
+            combo_col = feature_cols[0]
+        else:
+            combo_col = "FeatureCombination"
+            df[combo_col] = df[feature_cols].apply(
+                lambda row: "_".join(str(val) for val in row), axis=1
+            )
+
+        combo_counts = df[combo_col].value_counts()
+
+        if self.config.balance_method == "remove_insufficient":
+            sufficient_combos = combo_counts[
+                combo_counts >= self.config.min_samples
+            ].index
+            df = df[df[combo_col].isin(sufficient_combos)].copy()
+
+        elif self.config.balance_method == "undersample_to_min":
+            viable_combos = combo_counts[combo_counts >= self.config.min_samples]
+            if not viable_combos.empty:
+                min_count = viable_combos.min()
+                balanced_dfs = []
+                for combo in viable_combos.index:
+                    combo_data = df[df[combo_col] == combo]
+                    sampled = combo_data.sample(n=min_count, random_state=42)
+                    balanced_dfs.append(sampled)
+                df = pd.concat(balanced_dfs, ignore_index=True)
+
+        elif self.config.balance_method == "undersample_to_target":
+            target = self.config.target_samples or 3000
+            viable_combos = combo_counts[combo_counts >= self.config.min_samples]
+            balanced_dfs = []
+            for combo in viable_combos.index:
+                combo_data = df[df[combo_col] == combo]
+                sample_size = min(len(combo_data), target)
+                sampled = combo_data.sample(n=sample_size, random_state=42)
+                balanced_dfs.append(sampled)
+            df = pd.concat(balanced_dfs, ignore_index=True)
+
+        # Clean up temporary column
+        if len(feature_cols) > 1 and combo_col in df.columns:
+            df = df.drop(columns=[combo_col])
+
+        return df
+
+    def clear_cache(self):
+        """Clear session data cache."""
+        self._session_cache.clear()
 
 
-def process_dataset(session: fastf1.core.Session, 
-                    interval_seconds: int = 1.0,
-                    balance_by: list[BaseFeatures] = [BaseFeatures.DRIVER, BaseFeatures.SAFETY_CAR, BaseFeatures.LOCATION, BaseFeatures.COMPOUND]) -> DataFrame:
-    
-    if not session:
-        raise Exception("``session`` must be defined")
-    
-    if interval_seconds < 0.0:
-        raise Exception("``interval_seconds`` must be a positive number")
+def test():
+    # Basic usage with defaults
+    session = fastf1.get_session(2024, "São Paulo Grand Prix", "R")
+    session.load()
 
-    # Slice the dataset up into temporal windows (including getting telemetry for each driver)
-    temporal_df = create_high_freq_dataset(session, interval_seconds)
-    
-    # Balance the dataset
-    if len(balance_by) >= 1:
-        balanced_df = balance_dataset_by_feature(temporal_df, balance_by)
-    else:
-        balanced_df = temporal_df
-    
-    # Add clf labels
-    labeled_df = add_track_status_labels(balanced_df, session)
+    # Default config
+    config = PreprocessorConfig()
+    result = process_f1_session(session, config)
 
-    return add_event_info_columns(labeled_df, session)
+    print("Results:")
+    print(f"Shape: {result.shape}")
+    print(f"Columns: {list(result.columns)}")
+
+    # Customized preprocessing
+    config = PreprocessorConfig(
+        interval_seconds=0.5,
+        balance_features=[BaseFeatures.DRIVER, BaseFeatures.COMPOUND],
+        balance_method="undersample_to_target",
+        target_samples=2000,
+        include_track_status=True,
+    )
+    preprocessor = F1DatasetPreprocessor(config)
+    result = preprocessor.process_dataset(session)
+
+    print("Results:")
+    print(f"Shape: {result.shape}")
+    print(f"Columns: {list(result.columns)}")
+
+
+if __name__ == "__main__":
+    test()
+    # Output:
+    # ```
+    # Processing Summary:
+    # Success rate: 100.0%
+    # Total data points: 2434317
+    # INFO:__main__:Combined dataset: 24 races, 2434317 data points, 21 countries
+    # ```
