@@ -336,9 +336,18 @@ def test():
     session = fastf1.get_session(2024, "São Paulo Grand Prix", "R")
     session.load()
 
+    ########################################################
+    # Test 1 - Default config
+    ########################################################
+
     # Default config
     config = PreprocessorConfig()
-    result = process_f1_session(session, config)
+    preprocessor = F1DatasetPreprocessor(config)
+    result = preprocessor.process_dataset(session)
+
+    ########################################################
+    # Test 2 - Custom config
+    ########################################################
 
     print("Results:")
     print(f"Shape: {result.shape}")

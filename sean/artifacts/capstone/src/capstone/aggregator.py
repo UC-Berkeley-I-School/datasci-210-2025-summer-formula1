@@ -8,7 +8,7 @@ import logging
 from tqdm import tqdm
 import time
 
-from preprocessor import F1DatasetPreprocessor, PreprocessorConfig
+from .preprocessor import F1DatasetPreprocessor, PreprocessorConfig
 
 
 @dataclass
@@ -374,42 +374,31 @@ def create_aggregator(preprocessor_config: PreprocessorConfig = None,
                      max_workers: int = 4,
                      session_types: List[str] = None) -> F1SeasonAggregator:
     """Create a configured F1SeasonAggregator instance"""
-    
+
     aggregator_config = AggregatorConfig(
         max_workers=max_workers,
         session_types=session_types or ['R']
     )
-    
+
     return F1SeasonAggregator(preprocessor_config, aggregator_config)
 
 
-def quick_season_aggregation(year: int, 
-                           preprocessor_config: PreprocessorConfig = None,
-                           max_workers: int = 4) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    """
-    Quick function to aggregate a full season and return combined dataset + metadata
-    
-    Returns:
-        Tuple of (combined_dataset, metadata_summary)
-    """
-    aggregator = create_aggregator(preprocessor_config, max_workers)
-    
+def test():
+    aggregator = create_aggregator(preprocessor_config=None, max_workers=4)
+
     # Add season
-    summary = aggregator.add_season(year)
-    
+    summary = aggregator.add_season(2024)
+
     # Retry failures once
     if aggregator.failed_sessions:
         aggregator.retry_failed_sessions()
-    
+
     print(f"\nProcessing Summary:")
     print(f"Success rate: {summary['success_rate']:.1f}%")
     print(f"Total data points: {sum(m['DataPoints'] for m in aggregator.metadata)}")
-    
-    return aggregator.get_combined_dataset(), aggregator.get_metadata_summary()
 
-
-def test():
-    quick_season_aggregation(2024)
+    combined_dataset = aggregator.get_combined_dataset()
+    metadata_summary = aggregator.get_metadata_summary()
 
 
 if __name__ == "__main__":
