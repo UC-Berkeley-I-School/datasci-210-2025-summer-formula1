@@ -31,25 +31,14 @@ Example usage:
 __version__ = "0.1.0"
 
 # Import main classes and functions
-from .main import (
-    # Configuration classes
-    SessionConfig,
-    DataConfig,
-    # Core pipeline classes
-    RawDataExtractor,
-    DataAggregator,
-    TimeSeriesGenerator,
-    FeatureEngineer,
-    # Specialized encoders
-    TrackStatusLabelEncoder,
-    DriverLabelEncoder,
-    # Main pipeline function
-    create_safety_car_dataset,
-    # Utility functions
-    create_season_configs,
-    create_multi_session_configs,
-    setup_logger,
-)
+from .config import SessionConfig, DataConfig
+from .extraction import RawDataExtractor
+from .aggregation import DataAggregator
+from .time_series import TimeSeriesGenerator
+from .feature_engineering import FeatureEngineer
+from .encoders import TrackStatusLabelEncoder, DriverLabelEncoder
+from .pipeline import create_safety_car_dataset
+from .logging import setup_logger
 
 __all__ = [
     # Configuration
@@ -65,8 +54,6 @@ __all__ = [
     "DriverLabelEncoder",
     # Main functions
     "create_safety_car_dataset",
-    "create_season_configs",
-    "create_multi_session_configs",
     # Utilities
     "setup_logger",
 ]
