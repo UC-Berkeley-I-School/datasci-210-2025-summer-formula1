@@ -1,17 +1,18 @@
 """Main ETL pipeline for safety car dataset creation"""
 
+from typing import Any, Dict
+
 import numpy as np
 import pandas as pd
-from typing import Dict, Any
 from sklearn.preprocessing import LabelEncoder
 
-from .config import DataConfig
-from .extraction import RawDataExtractor
 from .aggregation import DataAggregator
-from .time_series import TimeSeriesGenerator
-from .feature_engineering import FeatureEngineer
+from .config import DataConfig
 from .encoders import TrackStatusLabelEncoder
-from .logging import setup_logger, logger
+from .extraction import RawDataExtractor
+from .feature_engineering import FeatureEngineer
+from .logging import setup_logger
+from .time_series import TimeSeriesGenerator
 
 
 def create_safety_car_dataset(
@@ -65,7 +66,7 @@ def create_safety_car_dataset(
     logger = setup_logger(enable_debug=enable_debug)
 
     # Log preprocessing configuration
-    logger.info(f"Preprocessing configuration:")
+    logger.info("Preprocessing configuration:")
     logger.info(
         f"  Missing values: {'enabled' if handle_missing else 'disabled'} ({missing_strategy})"
     )
@@ -75,8 +76,9 @@ def create_safety_car_dataset(
 
     # Step 1: Extract raw data
     extractor = RawDataExtractor(config.cache_dir)
-    sessions_data = [extractor.extract_session(session_config) 
-                    for session_config in config.sessions]
+    sessions_data = [
+        extractor.extract_session(session_config) for session_config in config.sessions
+    ]
 
     # Step 2: Aggregate data with track status alignment
     aggregator = DataAggregator()
@@ -87,11 +89,11 @@ def create_safety_car_dataset(
 
     # Step 3: Encode track status labels (if using track status)
     label_encoder = None
-    if target_column == 'TrackStatus':
+    if target_column == "TrackStatus":
         label_encoder = TrackStatusLabelEncoder()
-        if 'TrackStatus' in telemetry_data.columns:
-            encoded_labels = label_encoder.fit_transform(telemetry_data['TrackStatus'])
-            telemetry_data['TrackStatusEncoded'] = encoded_labels
+        if "TrackStatus" in telemetry_data.columns:
+            encoded_labels = label_encoder.fit_transform(telemetry_data["TrackStatus"])
+            telemetry_data["TrackStatusEncoded"] = encoded_labels
         else:
             raise ValueError("TrackStatus column not found in telemetry data")
     elif target_column not in telemetry_data.columns:
@@ -99,11 +101,11 @@ def create_safety_car_dataset(
 
     # Step 4: Generate time series sequences with built-in preprocessing
     ts_generator = TimeSeriesGenerator(
-        window_size=window_size, 
+        window_size=window_size,
         step_size=window_size // 2,
         prediction_horizon=prediction_horizon,
         handle_non_numeric=handle_non_numeric,
-        target_column=target_column
+        target_column=target_column,
     )
 
     X, y, metadata = ts_generator.generate_sequences(telemetry_data)
@@ -155,10 +157,10 @@ def create_safety_car_dataset(
 
     # Calculate class distribution
     unique, counts = np.unique(y_encoded, return_counts=True)
-    if hasattr(label_encoder, 'inverse_transform'):
+    if hasattr(label_encoder, "inverse_transform"):
         try:
             class_labels = label_encoder.inverse_transform(unique)
-        except:
+        except (ValueError, AttributeError):
             class_labels = unique
     else:
         class_labels = unique
