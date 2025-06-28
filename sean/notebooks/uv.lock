@@ -273,16 +273,16 @@ wheels = [
 
 [[package]]
 name = "f1-etl"
-version = "0.1.0"
+version = "0.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "fastf1" },
     { name = "pandas" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/d5/57/8bb028f3eddee22035084dacedd90f10e0ea65335ad3859fe337e3dc72f5/f1_etl-0.1.0.tar.gz", hash = "sha256:c6e58f1610f733236d81c5ccaeb0dbd329e16db902ff5eb44aa5bc9301c90436", size = 79442 }
+sdist = { url = "https://files.pythonhosted.org/packages/44/17/4db08f3ba2cc24c71fe4a5bdf6a8d4bcb505eb7c7cf05fa6fb26a89ecc91/f1_etl-0.2.1.tar.gz", hash = "sha256:8d68921a85d14c10ab167d66f88b1dd9d39d19450982076c490b82da2b42cf4a", size = 96003 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/db/03/5888f293525f19bc7ab8edfd4e956ceba9090b74d24738b92d16b24fe459/f1_etl-0.1.0-py3-none-any.whl", hash = "sha256:45b032b5881852b2e4f28befe18bfe4dc21f72f0ba3900e7b0d06707ff5aa0bd", size = 14426 },
+    { url = "https://files.pythonhosted.org/packages/a3/9f/f06e152d904e2e8d17d85580f8a968ea8876c8a14e28673baaf4ad40d8bd/f1_etl-0.2.1-py3-none-any.whl", hash = "sha256:73a1675705c0499b6d0103c4e1a00f444196d1a0d2846749784e16dcce96118b", size = 15621 },
 ]
 
 [[package]]
@@ -605,7 +605,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "f1-etl", specifier = ">=0.1.0" },
+    { name = "f1-etl", specifier = "==0.2.1" },
     { name = "fastf1", specifier = ">=3.5.3" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "numpy", specifier = "<2.3" },
