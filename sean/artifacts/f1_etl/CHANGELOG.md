@@ -1,3 +1,13 @@
+## v0.2.2 (2025-06-29)
+
+### Fix
+
+- add missing create_season_configs function
+
+### Refactor
+
+- remove convenience pipeline functions
+
 ## v0.2.1 (2025-06-28)
 
 ### Fix
