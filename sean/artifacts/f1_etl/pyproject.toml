@@ -31,6 +31,9 @@ version_scheme = "pep440"
 version_provider = "pep621"
 update_changelog_on_bump = true
 major_version_zero = true
+version_files = [
+    "src/f1_etl/__init__.py:__version__"
+]
 
 [tool.ruff]
 line-length = 88
