@@ -272,20 +272,6 @@ wheels = [
 ]
 
 [[package]]
-name = "f1-etl"
-version = "0.2.2"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "fastf1" },
-    { name = "pandas" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/21/bf/7babdf64698ef0bcb9f41f67e49c9cae4d7c0389bbf828349172346b692c/f1_etl-0.2.2.tar.gz", hash = "sha256:b623eccd2e33749a118acfaf38e03fe4bd038959c8107a1a7d93deb9fda70bd4", size = 86846 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/96/d5/ae9506a92d99d0c23ddfb859d0bc8f517b072d9dac2e21ff3a241ab5720d/f1_etl-0.2.2-py3-none-any.whl", hash = "sha256:b44c9c1d4b6a2d8a221981e9fdf0e9c4b1d4b6266a5b1120042380ee9cee08db", size = 16003 },
-]
-
-[[package]]
 name = "fastf1"
 version = "3.5.3"
 source = { registry = "https://pypi.org/simple" }
@@ -346,6 +332,34 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7590aa73f1f1d3fa9a380e654b86af429e0934a32f7d/idna-3.10.tar.gz", hash = "sha256:12f65c9b470abda6dc35cf8e63cc574b1c52b11df2c86030af0ac09b01b13ea9", size = 190490 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442 },
+]
+
+[[package]]
+name = "imbalanced-learn"
+version = "0.12.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "joblib" },
+    { name = "numpy" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "threadpoolctl" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/30/41/8b15f1df14ff38f1fdd4eb2b128478d99c38db4a14292270639ae9d65447/imbalanced-learn-0.12.4.tar.gz", hash = "sha256:8153ba385d296b07d97e0901a2624a86c06b48c94c2f92da3a5354827697b7a3", size = 478372 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/0d/c3bfccc5d460eec8ff56889802aa88f5d07280d5282b307a74558e6edc44/imbalanced_learn-0.12.4-py3-none-any.whl", hash = "sha256:d47fc599160d3ea882e712a3a6b02bdd353c1a6436d8d68d41b1922e6ee4a703", size = 258324 },
+]
+
+[[package]]
+name = "imblearn"
+version = "0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "imbalanced-learn" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/32/0a/f83099534a77757abf27427d339590c83cc68c3386690d4741d6454e185f/imblearn-0.0.tar.gz", hash = "sha256:d8fbb662919c1b16f438ad91a8256220e53bcf6815c9ad5502c518b798de34f2", size = 945 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/81/a7/4179e6ebfd654bd0eac0b9c06125b8b4c96a9d0a8ff9e9507eb2a26d2d7e/imblearn-0.0-py2.py3-none-any.whl", hash = "sha256:d42c2d709d22c00d2b9a91e638d57240a8b79b4014122d92181fcd2549a2f79a", size = 1874 },
 ]
 
 [[package]]
@@ -592,8 +606,8 @@ name = "notebooks"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "f1-etl" },
     { name = "fastf1" },
+    { name = "imblearn" },
     { name = "ipykernel" },
     { name = "numpy" },
     { name = "pandas" },
@@ -605,8 +619,8 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "f1-etl", specifier = "==0.2.2" },
     { name = "fastf1", specifier = ">=3.5.3" },
+    { name = "imblearn", specifier = ">=0.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
     { name = "numpy", specifier = "<2.3" },
     { name = "pandas", specifier = ">=2.3.0" },
