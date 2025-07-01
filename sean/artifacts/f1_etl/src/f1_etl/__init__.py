@@ -31,14 +31,15 @@ Example usage:
 __version__ = "0.1.0"
 
 # Import main classes and functions
-from .config import SessionConfig, DataConfig
-from .extraction import RawDataExtractor
 from .aggregation import DataAggregator
-from .time_series import TimeSeriesGenerator
+from .config import DataConfig, SessionConfig
+from .encoders import DriverLabelEncoder, TrackStatusLabelEncoder
+from .encoders_new import FixedVocabTrackStatusEncoder, compare_race_distributions
+from .extraction import RawDataExtractor
 from .feature_engineering import FeatureEngineer
-from .encoders import TrackStatusLabelEncoder, DriverLabelEncoder
-from .pipeline import create_safety_car_dataset
 from .logging import setup_logger
+from .pipeline import create_safety_car_dataset
+from .time_series import TimeSeriesGenerator
 
 __all__ = [
     # Configuration
@@ -52,6 +53,8 @@ __all__ = [
     # Encoders
     "TrackStatusLabelEncoder",
     "DriverLabelEncoder",
+    "FixedVocabTrackStatusEncoder",
+    "compare_race_distributions",
     # Main functions
     "create_safety_car_dataset",
     # Utilities

@@ -6,7 +6,11 @@ from sklearn.preprocessing import LabelEncoder
 
 
 class TrackStatusLabelEncoder:
-    """Encodes track status labels for safety car prediction"""
+    """
+    @deprecated - use ``FixedVocabTrackStatusEncoder`` instead
+
+    Encodes track status labels for safety car prediction
+    """
 
     def __init__(self):
         self.label_encoder = LabelEncoder()

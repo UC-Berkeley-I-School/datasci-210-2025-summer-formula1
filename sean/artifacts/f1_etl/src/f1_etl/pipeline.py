@@ -8,7 +8,7 @@ from sklearn.preprocessing import LabelEncoder
 
 from .aggregation import DataAggregator
 from .config import DataConfig
-from .encoders import TrackStatusLabelEncoder
+from .encoders_new import FixedVocabTrackStatusEncoder
 from .extraction import RawDataExtractor
 from .feature_engineering import FeatureEngineer
 from .logging import setup_logger
@@ -27,6 +27,7 @@ def create_safety_car_dataset(
     normalization_method: str = "standard",
     # Existing parameters
     target_column: str = "TrackStatus",
+    use_onehot_labels: bool = False,
     enable_debug: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -53,6 +54,8 @@ def create_safety_car_dataset(
         Note: If normalize=False, this parameter is ignored
     target_column : str, default='TrackStatus'
         Column to use as prediction target
+    use_onehot_labels : bool, default=False
+        If True, labels are one-hot encoded vectors. If False, integer labels.
     enable_debug : bool, default=False
         Enable debug logging
 
@@ -87,15 +90,24 @@ def create_safety_car_dataset(
     if telemetry_data.empty:
         raise ValueError("No telemetry data extracted")
 
-    # Step 3: Encode track status labels (if using track status)
-    label_encoder = None
+    # Step 3: Setup fixed vocabulary encoder for track status
+    logger.info("Creating new fixed vocabulary encoder")
+    label_encoder = FixedVocabTrackStatusEncoder(use_onehot=use_onehot_labels)
+
     if target_column == "TrackStatus":
-        label_encoder = TrackStatusLabelEncoder()
-        if "TrackStatus" in telemetry_data.columns:
-            encoded_labels = label_encoder.fit_transform(telemetry_data["TrackStatus"])
-            telemetry_data["TrackStatusEncoded"] = encoded_labels
-        else:
+        # Analyze distributions before encoding (optional but useful)
+        label_encoder.analyze_data(telemetry_data["TrackStatus"], "training_data")
+
+        if "TrackStatus" not in telemetry_data.columns:
             raise ValueError("TrackStatus column not found in telemetry data")
+
+        # Fit and transform
+        encoded_labels = label_encoder.fit_transform(telemetry_data["TrackStatus"])
+
+        telemetry_data["TrackStatusEncoded"] = (
+            encoded_labels.tolist() if use_onehot_labels else encoded_labels
+        )
+
     elif target_column not in telemetry_data.columns:
         raise ValueError(f"Target column '{target_column}' not found in telemetry data")
 
@@ -146,26 +158,29 @@ def create_safety_car_dataset(
         logger.info("Normalization disabled - using raw feature values")
         X_final = X_processed
 
-    # Encode prediction labels if using track status
-    if label_encoder:
+    # Encode prediction labels using fixed vocabulary encoder
+    if target_column == "TrackStatus":
         y_encoded = label_encoder.transform(pd.Series(y))
     else:
-        # For non-track status targets, create a simple label encoder
+        # For non-track status targets, use simple label encoder
         simple_encoder = LabelEncoder()
         y_encoded = simple_encoder.fit_transform(y)
         label_encoder = simple_encoder
 
     # Calculate class distribution
-    unique, counts = np.unique(y_encoded, return_counts=True)
-    if hasattr(label_encoder, "inverse_transform"):
+    if target_column == "TrackStatus":
+        class_distribution = label_encoder.get_class_distribution(pd.Series(y))
+        all_classes = label_encoder.get_classes()
+        n_classes = label_encoder.get_n_classes()
+    else:
+        unique, counts = np.unique(y_encoded, return_counts=True)
         try:
             class_labels = label_encoder.inverse_transform(unique)
         except (ValueError, AttributeError):
             class_labels = unique
-    else:
-        class_labels = unique
-
-    class_distribution = dict(zip(class_labels, counts))
+        class_distribution = dict(zip(class_labels, counts))
+        all_classes = list(class_distribution.keys())
+        n_classes = len(all_classes)
 
     # Enhanced configuration tracking
     processing_config = {
@@ -177,13 +192,35 @@ def create_safety_car_dataset(
         "normalize": normalize,
         "normalization_method": normalization_method if normalize else None,
         "target_column": target_column,
+        "use_onehot_labels": use_onehot_labels,
         "n_sequences": len(X_final),
         "n_features": X_final.shape[2],
+        "n_classes": n_classes,
         "feature_names": metadata[0]["features_used"] if metadata else [],
         "has_missing_values": np.isnan(X).any(),
         "missing_values_handled": handle_missing and np.isnan(X).any(),
         "normalization_applied": normalize,
+        "all_possible_classes": list(all_classes),
+        "classes_present": [k for k, v in class_distribution.items() if v > 0],
+        "label_shape": "one-hot" if use_onehot_labels else "integer",
+        "y_shape": y_encoded.shape if hasattr(y_encoded, "shape") else len(y_encoded),
     }
+
+    # Log final results
+    logger.info("Final dataset summary:")
+    logger.info(f"  Sequences: {len(X_final)}")
+    logger.info(f"  Features: {X_final.shape[2]}")
+    logger.info(f"  Classes: {n_classes} ({processing_config['label_shape']})")
+    logger.info(
+        f"  Label shape: {y_encoded.shape if hasattr(y_encoded, 'shape') else len(y_encoded)}"
+    )
+
+    for class_name, count in class_distribution.items():
+        if count > 0:
+            percentage = count / len(y_encoded) * 100
+            logger.info(
+                f"    {class_name:12s}: {count:5d} samples ({percentage:5.1f}%)"
+            )
 
     return {
         "X": X_final,
@@ -194,5 +231,7 @@ def create_safety_car_dataset(
         "feature_engineer": engineer,
         "raw_telemetry": telemetry_data,
         "class_distribution": class_distribution,
+        "all_classes": all_classes,
+        "n_classes": n_classes,
         "config": processing_config,
     }
