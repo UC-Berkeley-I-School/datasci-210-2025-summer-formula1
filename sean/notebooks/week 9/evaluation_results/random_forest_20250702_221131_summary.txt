@@ -1,0 +1,84 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: random_forest_20250702_221131
+Timestamp: 2025-07-02T22:11:31.499543
+Target Class: safety_car
+Test Size: 20.1%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: single_session_2024_Saudia_Arabian_Grand_Prix_R
+Drivers: 1
+Window Size: 100
+Prediction Horizon: 10
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 1,321
+Shape: (1321, 100, 9)
+Class Distribution:
+  green: 1,188
+  safety_car: 62
+  yellow: 71
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: random_forest
+Base Estimator: RandomForestClassifier
+Wrapper: Catch22Classifier
+Custom Weights: True
+Hyperparameters:
+  bootstrap: True
+  ccp_alpha: 0.0
+  class_weight: {0: 1.0, 1: 25.0, 2: 100.0, 3: 25.0, 4: 50.0, 5: 50.0, 6: 25.0}
+  criterion: gini
+  max_depth: 10
+  max_features: sqrt
+  max_leaf_nodes: None
+  max_samples: None
+  min_impurity_decrease: 0.0
+  min_samples_leaf: 1
+  min_samples_split: 2
+  min_weight_fraction_leaf: 0.0
+  monotonic_cst: None
+  n_estimators: 100
+  n_jobs: None
+  oob_score: False
+  random_state: 42
+  verbose: 0
+  warm_start: False
+Class Weights:
+  Class 0: 1.0
+  Class 1: 25.0
+  Class 2: 100.0
+  Class 3: 25.0
+  Class 4: 50.0
+  Class 5: 50.0
+  Class 6: 25.0
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.9509
+F1-Macro: 0.8331
+F1-Weighted: 0.9513
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 1.0000
+Recall: 0.6154
+F1-Score: 0.7619
+True Positives: 8
+False Negatives: 5 (missed events)
+False Positives: 0 (false alarms)
+True Negatives: 252
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.975      0.971      0.973      238       
+safety_car   1.000      0.615      0.762      13        
+yellow       0.650      0.929      0.765      14        

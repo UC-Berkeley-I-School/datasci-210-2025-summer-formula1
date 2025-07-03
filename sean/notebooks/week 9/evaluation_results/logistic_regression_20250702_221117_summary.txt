@@ -1,0 +1,80 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: logistic_regression_20250702_221117
+Timestamp: 2025-07-02T22:11:17.262021
+Target Class: safety_car
+Test Size: 20.1%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: single_session_2024_Saudia_Arabian_Grand_Prix_R
+Drivers: 1
+Window Size: 100
+Prediction Horizon: 10
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 1,321
+Shape: (1321, 100, 9)
+Class Distribution:
+  green: 1,188
+  safety_car: 62
+  yellow: 71
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: logistic_regression
+Base Estimator: LogisticRegression
+Wrapper: Catch22Classifier
+Custom Weights: True
+Hyperparameters:
+  C: 0.1
+  class_weight: {0: 1.0, 1: 25.0, 2: 100.0, 3: 25.0, 4: 50.0, 5: 50.0, 6: 25.0}
+  dual: False
+  fit_intercept: True
+  intercept_scaling: 1
+  l1_ratio: None
+  max_iter: 3000
+  multi_class: deprecated
+  n_jobs: None
+  penalty: l1
+  random_state: 42
+  solver: saga
+  tol: 0.0001
+  verbose: 0
+  warm_start: False
+Class Weights:
+  Class 0: 1.0
+  Class 1: 25.0
+  Class 2: 100.0
+  Class 3: 25.0
+  Class 4: 50.0
+  Class 5: 50.0
+  Class 6: 25.0
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.8113
+F1-Macro: 0.6413
+F1-Weighted: 0.8477
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.2391
+Recall: 0.8462
+F1-Score: 0.3729
+True Positives: 11
+False Negatives: 2 (missed events)
+False Positives: 35 (false alarms)
+True Negatives: 217
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.985      0.803      0.884      238       
+safety_car   0.239      0.846      0.373      13        
+yellow       0.520      0.929      0.667      14        

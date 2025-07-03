@@ -272,6 +272,20 @@ wheels = [
 ]
 
 [[package]]
+name = "f1-etl"
+version = "0.2.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fastf1" },
+    { name = "pandas" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/1b/df/6259f46107e64dc1480664282280264c50bc0f676c48b318d96c105af95e/f1_etl-0.2.3.tar.gz", hash = "sha256:a7473e6360ea52e19a524448204b38578762b94a06427e3bb89ea89d5e2162de", size = 93115 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/21/40/8a8c88540f0970cf911740da4612073b3670db2feb3fbc033c9f82179720/f1_etl-0.2.3-py3-none-any.whl", hash = "sha256:9ea66663b40b6f56a56ef6c499bbc10e823f2bc5bf1d354b82625eb60f048ae2", size = 19279 },
+]
+
+[[package]]
 name = "fastf1"
 version = "3.5.3"
 source = { registry = "https://pypi.org/simple" }
@@ -606,6 +620,7 @@ name = "notebooks"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "f1-etl" },
     { name = "fastf1" },
     { name = "imblearn" },
     { name = "ipykernel" },
@@ -619,6 +634,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "f1-etl", specifier = "==0.2.3" },
     { name = "fastf1", specifier = ">=3.5.3" },
     { name = "imblearn", specifier = ">=0.0" },
     { name = "ipykernel", specifier = ">=6.29.5" },
