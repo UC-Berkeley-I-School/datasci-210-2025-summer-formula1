@@ -58,7 +58,7 @@ class DatasetMetadata:
     # Processing details
     features_used: str = "all"  # "all", "speed_only", "custom_subset", etc.
     is_multivariate: bool = True
-    preprocessing_steps: List[str] = None
+    preprocessing_steps: Optional[List[str]] = None
 
 @dataclass
 class ModelMetadata:
@@ -84,7 +84,7 @@ class EvaluationMetadata:
     test_size: float
     stratified_split: bool = True
     target_class_focus: str = "safety_car"
-    evaluation_metrics: List[str] = None
+    evaluation_metrics: Optional[List[str]] = None
 
 class ModelEvaluationSuite:
     """Comprehensive model evaluation with metadata tracking and file output"""
@@ -900,16 +900,16 @@ def create_balanced_pipeline(classifier, sampling_strategy='auto'):
 # Example usage workflow:
 
 data_config = DataConfig(
-    sessions=[SessionConfig(2024, 'Saudia Arabian Grand Prix', 'R')],
-    # sessions=create_multi_session_configs(year=2023, session_types=['R'], include_testing=False),
+    # sessions=[SessionConfig(2024, 'Saudia Arabian Grand Prix', 'R')],
+    sessions=create_multi_session_configs(year=2023, session_types=['R'], include_testing=False),
     drivers=['1'],
     include_weather=False
 )
 
 dataset = create_safety_car_dataset(
     config=data_config,
-    window_size=1000,
-    prediction_horizon=500,
+    window_size=50,
+    prediction_horizon=100,
     handle_non_numeric="encode",
     handle_missing=True,
     missing_strategy="forward_fill",
@@ -969,7 +969,7 @@ model_metadata = create_model_metadata(
     class_weights=class_weight
 )
 training_results = train_and_validate_model(
-    model=models['logistic_regression'],
+    model=models[model_name],
     splits=splits,
     class_names=class_names,
     evaluator=evaluator,
@@ -983,8 +983,8 @@ trained_model = training_results['model']
 
 # 5. Evaluate on a completely different race
 external_config = DataConfig(
-    sessions=[SessionConfig(2025, 'Saudi Arabian Grand Prix', 'R')],  # Different race
-    # sessions=create_multi_session_configs(year=2024, session_types=['R'], include_testing=False),
+    # sessions=[SessionConfig(2025, 'Saudi Arabian Grand Prix', 'R')],  # Different race
+    sessions=create_multi_session_configs(year=2024, session_types=['R'], include_testing=False),
     drivers=['1'],
     include_weather=False
 )
