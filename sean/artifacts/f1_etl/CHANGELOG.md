@@ -1,3 +1,9 @@
+## v0.3.1 (2025-07-04)
+
+### Fix
+
+- **train**: add missing import to training.py
+
 ## v0.3.0 (2025-07-04)
 
 ### Feat
