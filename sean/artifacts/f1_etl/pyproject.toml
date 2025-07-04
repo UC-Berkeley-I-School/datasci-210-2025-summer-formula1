@@ -8,7 +8,9 @@ authors = [
 ]
 requires-python = ">=3.11"
 dependencies = [
+    "aeon",
     "fastf1>=3.5.3",
+    "imbalanced-learn",
     "pandas>=2.3.0",
     "tqdm>=4.67.1",
 ]
@@ -56,3 +58,7 @@ ignore = [
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+[tool.uv.sources]
+aeon = { git = "https://github.com/aeon-toolkit/aeon.git", rev = "main" }
+imbalanced-learn = { git = "https://github.com/scikit-learn-contrib/imbalanced-learn", rev = "master" }
