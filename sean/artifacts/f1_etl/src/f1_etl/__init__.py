@@ -60,3 +60,41 @@ __all__ = [
     # Utilities
     "setup_logger",
 ]
+
+# Training functionality
+from .train import (
+    # Metadata
+    DatasetMetadata,
+    EvaluationMetadata,
+    # Evaluation
+    ModelEvaluationSuite,
+    ModelMetadata,
+    create_advanced_models,
+    # Model creation
+    create_basic_models,
+    create_metadata_from_f1_dataset,
+    create_model_metadata,
+    evaluate_on_external_dataset,
+    # Data preparation
+    prepare_data_with_validation,
+    # Training
+    train_and_validate_model,
+)
+
+# Update __all__ to include train exports
+__all__.extend(
+    [
+        # Training
+        "DatasetMetadata",
+        "ModelMetadata",
+        "EvaluationMetadata",
+        "create_metadata_from_f1_dataset",
+        "create_model_metadata",
+        "ModelEvaluationSuite",
+        "prepare_data_with_validation",
+        "create_basic_models",
+        "create_advanced_models",
+        "train_and_validate_model",
+        "evaluate_on_external_dataset",
+    ]
+)
