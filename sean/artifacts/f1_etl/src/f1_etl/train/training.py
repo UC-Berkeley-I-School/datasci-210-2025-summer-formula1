@@ -6,7 +6,7 @@ from datetime import datetime
 from sklearn.metrics import accuracy_score, f1_score
 
 from ..pipeline import create_safety_car_dataset
-from .metadata import EvaluationMetadata
+from .metadata import EvaluationMetadata, create_metadata_from_f1_dataset
 
 
 def train_and_validate_model(
