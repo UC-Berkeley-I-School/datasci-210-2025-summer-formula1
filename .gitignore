@@ -1,3 +1,6 @@
+*complete.json
+*summary.txt
+
 **/*/f1_cache
 f1_cache/**/*
 
@@ -262,3 +265,4 @@ $RECYCLE.BIN/
 *.lnk
 
 # End of https://www.toptal.com/developers/gitignore/api/python,jupyternotebooks,macos,windows,linux
+sean/notebooks/week 9/evaluation_results/.gitignore
