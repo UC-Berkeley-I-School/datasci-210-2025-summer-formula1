@@ -1,0 +1,89 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: random_forest_20250704_104932
+Timestamp: 2025-07-04T10:49:35.455175
+Target Class: safety_car
+Test Size: 13.9%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: single_session_2023_Saudia_Arabian_Grand_Prix_R
+Drivers: 1
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 2,684
+Shape: (2684, 50, 9)
+Class Distribution:
+  green: 2,540
+  safety_car: 132
+  yellow: 12
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: random_forest
+Base Estimator: RandomForestClassifier
+Wrapper: Catch22Classifier
+Custom Weights: True
+Hyperparameters:
+  bootstrap: True
+  ccp_alpha: 0.0
+  class_weight: None
+  criterion: gini
+  max_depth: 10
+  max_features: sqrt
+  max_leaf_nodes: None
+  max_samples: None
+  min_impurity_decrease: 0.0
+  min_samples_leaf: 1
+  min_samples_split: 2
+  min_weight_fraction_leaf: 0.0
+  monotonic_cst: None
+  n_estimators: 100
+  n_jobs: None
+  oob_score: False
+  random_state: 42
+  verbose: 0
+  warm_start: False
+Class Weights:
+  Class 0: 1.0
+  Class 1: 10.0
+  Class 2: 50.0
+  Class 3: 1.0
+  Class 4: 20.0
+  Class 5: 20.0
+  Class 6: 10.0
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.9373
+F1-Macro: 0.4838
+F1-Weighted: 0.9676
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.0000
+Recall: 0.0000
+F1-Score: 0.0000
+True Positives: 0
+False Negatives: 0 (missed events)
+False Positives: 19 (false alarms)
+True Negatives: 284
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        1.000      0.937      0.968      303       
+safety_car   0.000      0.000      0.000      0         
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_safety_car
+True_green              284               19
+True_safety_car           0                0
