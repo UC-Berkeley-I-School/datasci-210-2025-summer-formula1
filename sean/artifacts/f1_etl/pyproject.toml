@@ -1,6 +1,6 @@
 [project]
 name = "f1-etl"
-version = "0.2.3"
+version = "0.3.0"
 description = "This package contains an ETL pipeline for extracting, transforming, and preparing Formula 1 telemetry data for time series classification tasks, specifically designed for safety car prediction and other F1 data science applications."
 readme = "README.md"
 authors = [

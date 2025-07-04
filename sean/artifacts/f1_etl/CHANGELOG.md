@@ -1,3 +1,9 @@
+## v0.3.0 (2025-07-04)
+
+### Feat
+
+- bake training script into train subpackage
+
 ## v0.2.3 (2025-07-01)
 
 ### Fix
