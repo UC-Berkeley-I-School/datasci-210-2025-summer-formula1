@@ -77,7 +77,10 @@ def main():
     }
 
     # 5. Train model
+    model_name = "rocket_with_imb_pipeline"
+
     # models = create_basic_models(class_weight=class_weight)
+
     # model = models['random_forest']
 
     # model = RocketClassifier(n_kernels=1000, class_weight=class_weight)
@@ -92,7 +95,7 @@ def main():
 
     model = ImbPipeline(
         [
-            ("tabularize", Tabularizer()),
+            # ("tabularize", Tabularizer()),
             (
                 "adasyn",
                 ADASYN(sampling_strategy="minority", n_neighbors=2, random_state=42),
@@ -107,7 +110,7 @@ def main():
             #         random_state=42,
             #     ),
             # ),
-            ("classify", RocketClassifier(n_kernels=1000)),
+            ("classify", RocketClassifier(n_kernels=1000, class_weight=class_weight)),
         ]
     )
 
@@ -119,9 +122,7 @@ def main():
     )
 
     model_metadata = create_model_metadata(
-        model_name='random_forest',
-        model=model,
-        class_weights=class_weight
+        model_name=model_name, model=model, class_weights=class_weight
     )
 
     training_results = train_and_validate_model(
