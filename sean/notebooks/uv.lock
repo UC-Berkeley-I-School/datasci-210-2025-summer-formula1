@@ -279,22 +279,6 @@ wheels = [
 ]
 
 [[package]]
-name = "f1-etl"
-version = "0.3.1"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "aeon" },
-    { name = "fastf1" },
-    { name = "imbalanced-learn" },
-    { name = "pandas" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/93/73/eb9508a55859bd5b20597a9c6a25166481418d1ab209fa95c68234e7b1da/f1_etl-0.3.1.tar.gz", hash = "sha256:0d918d49a1b87485ed8e7d6ab6b044bdfc298a69c4b638e5ecfc8619f67641ed", size = 105503 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/b3/db/767531a980864681de1416b121923048c55683dae9d20f0b9f5c7ea47a71/f1_etl-0.3.1-py3-none-any.whl", hash = "sha256:a61cfc8037b0400ddcb6763ebba0fae1d1892735e6c6523ac7272d04ffc0a7ec", size = 32603 },
-]
-
-[[package]]
 name = "fastf1"
 version = "3.5.3"
 source = { registry = "https://pypi.org/simple" }
@@ -816,7 +800,6 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "aeon" },
-    { name = "f1-etl" },
     { name = "fastf1" },
     { name = "imbalanced-learn" },
     { name = "ipykernel" },
@@ -832,7 +815,6 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aeon", git = "https://github.com/aeon-toolkit/aeon.git?rev=main" },
-    { name = "f1-etl", specifier = "==0.3.1" },
     { name = "fastf1", specifier = ">=3.5.3" },
     { name = "imbalanced-learn", git = "https://github.com/scikit-learn-contrib/imbalanced-learn?rev=master" },
     { name = "ipykernel", specifier = ">=6.29.5" },

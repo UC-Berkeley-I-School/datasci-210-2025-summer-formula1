@@ -1,3 +1,9 @@
+## v0.4.0 (2025-07-06)
+
+### Feat
+
+- implement resampling methods for combatting class imbalance
+
 ## v0.3.1 (2025-07-04)
 
 ### Fix
