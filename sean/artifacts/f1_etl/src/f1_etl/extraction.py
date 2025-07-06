@@ -32,7 +32,28 @@ class RawDataExtractor:
                 return pickle.load(f)
 
         session = fastf1.get_session(config.year, config.race, config.session_type)
-        session.load()
+        try:
+            session.load()
+
+            # Verify the session is actually loaded by checking if required data exists
+            if (
+                not hasattr(session, "_session_start_time")
+                or session._session_start_time is None
+            ):
+                print(f"Warning: Session data may not be fully loaded. Retrying...")
+                session.load()  # Try again
+
+        except Exception as e:
+            print(f"Error loading session data: {e}")
+            raise
+
+        # Additional verification - check if we can access the properties we need
+        try:
+            _ = session.session_start_time  # Test access
+            _ = session.t0_date
+        except Exception as e:
+            print(f"Session data not properly loaded: {e}")
+            raise
 
         driver_mapping = {}
         for driver_number in session.drivers:
