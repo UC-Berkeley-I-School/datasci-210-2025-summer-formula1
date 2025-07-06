@@ -1,3 +1,9 @@
+## v0.4.1 (2025-07-06)
+
+### Fix
+
+- add error handling for session loading
+
 ## v0.4.0 (2025-07-06)
 
 ### Feat
