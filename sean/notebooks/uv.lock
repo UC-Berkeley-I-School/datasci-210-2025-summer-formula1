@@ -280,7 +280,7 @@ wheels = [
 
 [[package]]
 name = "f1-etl"
-version = "0.4.0"
+version = "0.4.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aeon" },
@@ -289,9 +289,9 @@ dependencies = [
     { name = "pandas" },
     { name = "tqdm" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/6a/d46b7c248057f4f3210ad5ead694ed1387a125ffaf940a47637514da7f86/f1_etl-0.4.0.tar.gz", hash = "sha256:34fbbce3a9981e1ec6eb9dfd227fd6813705115201d547f7563712c9259c9b05", size = 108467 }
+sdist = { url = "https://files.pythonhosted.org/packages/20/d3/ade8810d254f5f61c3e92403fea80042958c1ce151fc613dddde73fbda72/f1_etl-0.4.1.tar.gz", hash = "sha256:0cd88fa75bbf3c62d693751760763758b703ef563edc4402d64a9356db895e66", size = 108686 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/12/cd/8a11940640dd0bf772d32b6b74aa8da64cf94e1e29e97edd017db96e7d2a/f1_etl-0.4.0-py3-none-any.whl", hash = "sha256:0540b6ba248f0f380c422925fe7686d60fbd9d3cd43f0297d747abb3935c3782", size = 36409 },
+    { url = "https://files.pythonhosted.org/packages/7b/83/ac81a30ce5345ea4c45e8d02d041d85be2b4ab41c587513734b4ce721d5a/f1_etl-0.4.1-py3-none-any.whl", hash = "sha256:35af96283ad7cae3b22792cc2ff3d98a83084deb0ab3c5803faa0b7317efe808", size = 36635 },
 ]
 
 [[package]]
@@ -832,7 +832,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "aeon", git = "https://github.com/aeon-toolkit/aeon.git?rev=main" },
-    { name = "f1-etl", specifier = "==0.4.0" },
+    { name = "f1-etl", specifier = "==0.4.1" },
     { name = "fastf1", specifier = ">=3.5.3" },
     { name = "imbalanced-learn", git = "https://github.com/scikit-learn-contrib/imbalanced-learn?rev=master" },
     { name = "ipykernel", specifier = ">=6.29.5" },
