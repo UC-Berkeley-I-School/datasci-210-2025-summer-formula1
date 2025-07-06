@@ -1,6 +1,6 @@
 """Main ETL pipeline for safety car dataset creation"""
 
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Optional
 
 import numpy as np
 import pandas as pd
@@ -12,6 +12,7 @@ from .encoders_new import FixedVocabTrackStatusEncoder
 from .extraction import RawDataExtractor
 from .feature_engineering import FeatureEngineer
 from .logging import setup_logger
+from .resampling import apply_resampling
 from .time_series import TimeSeriesGenerator
 
 
@@ -25,9 +26,11 @@ def create_safety_car_dataset(
     missing_strategy: str = "forward_fill",
     normalize: bool = True,
     normalization_method: str = "standard",
-    # Existing parameters
     target_column: str = "TrackStatus",
     use_onehot_labels: bool = False,
+    resampling_strategy: Optional[str] = None,
+    resampling_target_class: Optional[str] = None,
+    resampling_config: Optional[Dict[str, Any]] = None,
     enable_debug: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -56,6 +59,15 @@ def create_safety_car_dataset(
         Column to use as prediction target
     use_onehot_labels : bool, default=False
         If True, labels are one-hot encoded vectors. If False, integer labels.
+    resampling_strategy : str, optional
+        Resampling strategy to apply before windowing ('adasyn', 'smote', 'borderline_smote', None)
+    resampling_target_class : str, optional
+        Specific class to focus resampling on (e.g., '2' for safety car)
+    resampling_config : dict, optional
+        Custom sampling configuration. Examples:
+        - {'2': 1000000}: resample class 2 to have 1M samples
+        - {'2': 0.5}: resample class 2 to 50% of majority class
+        - 'not majority': resample all but the majority class
     enable_debug : bool, default=False
         Enable debug logging
 
@@ -75,6 +87,9 @@ def create_safety_car_dataset(
     )
     logger.info(
         f"  Normalization: {'enabled' if normalize else 'disabled'} ({normalization_method if normalize else 'N/A'})"
+    )
+    logger.info(
+        f"  Resampling: {resampling_strategy if resampling_strategy else 'disabled'}"
     )
 
     # Step 1: Extract raw data
@@ -110,6 +125,17 @@ def create_safety_car_dataset(
 
     elif target_column not in telemetry_data.columns:
         raise ValueError(f"Target column '{target_column}' not found in telemetry data")
+
+    # Step 3.5: Apply resampling if requested (BEFORE windowing)
+    if resampling_strategy:
+        telemetry_data = apply_resampling(
+            telemetry_data,
+            target_column=target_column,
+            strategy=resampling_strategy,
+            logger=logger,
+            target_class=resampling_target_class,
+            sampling_strategy=resampling_config,
+        )
 
     # Step 4: Generate time series sequences with built-in preprocessing
     ts_generator = TimeSeriesGenerator(
@@ -193,6 +219,7 @@ def create_safety_car_dataset(
         "normalization_method": normalization_method if normalize else None,
         "target_column": target_column,
         "use_onehot_labels": use_onehot_labels,
+        "resampling_strategy": resampling_strategy,
         "n_sequences": len(X_final),
         "n_features": X_final.shape[2],
         "n_classes": n_classes,

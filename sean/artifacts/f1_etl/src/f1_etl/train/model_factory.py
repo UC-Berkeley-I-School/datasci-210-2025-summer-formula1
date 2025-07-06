@@ -98,6 +98,14 @@ def create_balanced_pipeline(classifier, sampling_strategy="auto"):
     """
     Create a pipeline that handles imbalanced data using SMOTE
 
+    WARNING: This applies SMOTE AFTER windowing, which can cause data leakage
+    between overlapping windows. For time series data, it's recommended to use
+    the resampling_strategy parameter in create_safety_car_dataset() instead,
+    which applies resampling BEFORE windowing.
+
+    This function is kept for backwards compatibility and special cases where
+    post-windowing resampling is specifically desired.
+
     Args:
         classifier: Base classifier to use
         sampling_strategy: SMOTE sampling strategy

@@ -95,6 +95,7 @@ def evaluate_on_external_dataset(
     model_metadata,
     class_names,
     evaluator,
+    resampling_strategy=None,
 ):
     """
     Evaluate a trained model on a completely different dataset (e.g., different race)
@@ -106,6 +107,9 @@ def evaluate_on_external_dataset(
         model_metadata: ModelMetadata instance
         class_names: List of class names
         evaluator: ModelEvaluationSuite instance
+        resampling_strategy: Optional resampling strategy for external dataset
+                           ('adasyn', 'smote', 'borderline_smote', None)
+                           Note: Usually you want None to evaluate on natural distribution
 
     Returns:
         Evaluation results on external dataset
@@ -116,6 +120,9 @@ def evaluate_on_external_dataset(
 
     # Load external dataset with same preprocessing as training
     print("Loading external dataset...")
+    if resampling_strategy:
+        print(f"Note: Applying {resampling_strategy} resampling to external dataset")
+
     external_dataset = create_safety_car_dataset(
         config=external_config,
         window_size=original_dataset_metadata.window_size,
@@ -126,6 +133,7 @@ def evaluate_on_external_dataset(
         normalize=True,
         normalization_method="per_sequence",
         target_column="TrackStatus",
+        resampling_strategy=resampling_strategy,  # Add resampling support
         enable_debug=False,
     )
 
@@ -183,7 +191,7 @@ def evaluate_on_external_dataset(
             "target_class": "safety_car",
             "target_class_index": list(class_names).index("safety_car"),
         },
-        "note": "External dataset evaluation - model trained on different data",
+        "note": f"External dataset evaluation - model trained on different data{' (with resampling)' if resampling_strategy else ''}",
     }
 
     # Print and save results

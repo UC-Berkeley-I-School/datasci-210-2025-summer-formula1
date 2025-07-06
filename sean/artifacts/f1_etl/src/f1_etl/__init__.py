@@ -40,6 +40,7 @@ from .feature_engineering import FeatureEngineer
 from .logging import setup_logger
 from .pipeline import create_safety_car_dataset
 from .time_series import TimeSeriesGenerator
+from .resampling import apply_resampling
 
 __all__ = [
     # Configuration
@@ -55,6 +56,8 @@ __all__ = [
     "DriverLabelEncoder",
     "FixedVocabTrackStatusEncoder",
     "compare_race_distributions",
+    # Resampling
+    "apply_resampling",
     # Main functions
     "create_safety_car_dataset",
     # Utilities

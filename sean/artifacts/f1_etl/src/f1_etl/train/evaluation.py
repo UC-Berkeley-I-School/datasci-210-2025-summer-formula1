@@ -359,7 +359,9 @@ class ModelEvaluationSuite:
         f.write("DATASET CONFIGURATION\n")
         f.write("-" * 40 + "\n")
         f.write(f"Scope: {dataset_meta['scope']}\n")
-        f.write(f"Drivers: {', '.join(dataset_meta['drivers'])}\n")
+        f.write(
+            f"Drivers: {', '.join(dataset_meta['drivers']) if dataset_meta['drivers'] else 'all_drivers'}\n"
+        )
         f.write(f"Window Size: {dataset_meta['window_size']}\n")
         f.write(f"Prediction Horizon: {dataset_meta['prediction_horizon']}\n")
         f.write(f"Features Used: {dataset_meta['features_used']}\n")
