@@ -46,6 +46,9 @@ def main():
         normalize=True,
         target_column="TrackStatus",
         resampling_strategy="smote",
+        resampling_config={
+            "2": 0.5
+        }
     )
 
     # 2. Create metadata
