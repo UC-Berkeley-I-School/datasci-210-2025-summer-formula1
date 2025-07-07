@@ -35,7 +35,7 @@ def main():
             # SessionConfig(2024, "United States Paulo Grand Prix", "R"),
             # SessionConfig(2024, "Monaco Paulo Grand Prix", "R"),
         ],
-        # drivers=["1"],  # <-- optionally filter down drivers
+        drivers=["1"],  # <-- optionally filter down drivers
         include_weather=False,
     )
 
@@ -46,9 +46,7 @@ def main():
         normalize=True,
         target_column="TrackStatus",
         resampling_strategy="smote",
-        resampling_config={
-            "2": 0.5
-        }
+        resampling_config={"2": 0.5},
     )
 
     # 2. Create metadata
@@ -152,7 +150,7 @@ def main():
             # SessionConfig(2024, "United States Paulo Grand Prix", "R"),
             # SessionConfig(2024, "Monaco Paulo Grand Prix", "R"),
         ],
-        # drivers=["1"],
+        drivers=["1"],
         include_weather=False,
     )
 
