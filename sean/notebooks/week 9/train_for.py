@@ -25,17 +25,17 @@ def main():
     data_config = DataConfig(
         # sessions=create_multi_session_configs(year=2023, session_types=['R'], include_testing=False),
         sessions=[
-            SessionConfig(2024, "Qatar Grand Prix", "R"),
-            SessionConfig(2024, "Chinese Grand Prix", "R"),
-            # SessionConfig(2024, "Canadian Grand Prix", "R"),
-            SessionConfig(2024, "Mexico City Grand Prix", "R"),
-            SessionConfig(2024, "São Paulo Grand Prix", "R"),
-            SessionConfig(2024, "Miami Paulo Grand Prix", "R"),
-            # SessionConfig(2024, "Saudia Arabian Grand Prix", "R"),
-            # SessionConfig(2024, "United States Paulo Grand Prix", "R"),
-            # SessionConfig(2024, "Monaco Paulo Grand Prix", "R"),
+            SessionConfig(2024, "Qatar Grand Prix", "R", drivers=["27", "31", "43", "23", "77", "11"]),
+            SessionConfig(2024, "Chinese Grand Prix", "R", drivers=["77", "18", "3", "20", "22"]),
+            # SessionConfig(2024, "Canadian Grand Prix", "R", drivers=["2", "55", "23"]),
+            SessionConfig(2024, "Mexico City Grand Prix", "R", drivers=["22", "23"]),
+            SessionConfig(2024, "São Paulo Grand Prix", "R", drivers=["27", "43", "55"]),
+            SessionConfig(2024, "Miami Grand Prix", "R", drivers=["1", "20", "2"]),
+            # SessionConfig(2024, "Saudi Arabian Grand Prix", "R", drivers=["18"]),
+            SessionConfig(2024, "United States Grand Prix", "R", drivers=["44"]),
+            SessionConfig(2024, "Monaco Grand Prix", "R", drivers=["11", "20", "27"]),
         ],
-        drivers=["1"],  # <-- optionally filter down drivers
+        # drivers=[],  # <-- optionally filter down drivers
         include_weather=False,
     )
 
@@ -46,7 +46,7 @@ def main():
         normalize=True,
         target_column="TrackStatus",
         resampling_strategy="smote",
-        resampling_config={"2": 0.5},
+        # resampling_config={"2": 0.5},
     )
 
     # 2. Create metadata
@@ -62,18 +62,18 @@ def main():
 
     # 4. Define class weights
     y_enc = dataset["label_encoder"]
-    # class_weight = {
-    #     y_enc.class_to_idx["green"]: 1.0,
-    #     y_enc.class_to_idx["red"]: 1.0,
-    #     y_enc.class_to_idx["safety_car"]: 5.0,
-    #     y_enc.class_to_idx["unknown"]: 1.0,
-    #     y_enc.class_to_idx["vsc"]: 1.0,
-    #     y_enc.class_to_idx["vsc_ending"]: 1.0,
-    #     y_enc.class_to_idx["yellow"]: 1.0,
-    # }
+    class_weight = {
+        y_enc.class_to_idx["green"]: 1.0,
+        y_enc.class_to_idx["red"]: 1.0,
+        y_enc.class_to_idx["safety_car"]: 5.0,
+        y_enc.class_to_idx["unknown"]: 1.0,
+        y_enc.class_to_idx["vsc"]: 1.0,
+        y_enc.class_to_idx["vsc_ending"]: 1.0,
+        y_enc.class_to_idx["yellow"]: 1.0,
+    }
 
     # 5. Train model
-    model_name = "rocket_smote_no_cls_weights"
+    model_name = "rocket_sc_smote_sc_drivers"
     # model_name = "rocket_with_imb_pipeline"
     # model_name = "random_forest"
 
@@ -81,37 +81,8 @@ def main():
     # models = create_basic_models()
     # model = models[model_name]
 
-    model = RocketClassifier(n_kernels=1000)
-    # model = RocketClassifier(n_kernels=1000, class_weight=class_weight)
-
-    # model = ImbPipeline(
-    #     [
-    #         ("tabularize", Tabularizer()),
-    #         ("smote", SMOTE(sampling_strategy="minority", k_neighbors=2, random_state=42)),
-    #         ("classify", RocketClassifier(n_kernels=1000)),
-    #     ]
-    # )
-
-    # model = ImbPipeline(
-    #     [
-    #         ("tabularize", Tabularizer()),
-    #         # (
-    #         #     "adasyn",
-    #         #     ADASYN(sampling_strategy="minority", n_neighbors=2, random_state=42),
-    #         # ),
-    #         (
-    #             "smote",
-    #             BorderlineSMOTE(
-    #                 sampling_strategy="minority",
-    #                 k_neighbors=2,  # For synthetic sample generation
-    #                 m_neighbors=2,  # For danger detection
-    #                 kind="borderline-1",  # or try "borderline-2"
-    #                 random_state=42,
-    #             ),
-    #         ),
-    #         ("classify", RocketClassifier(n_kernels=1000, class_weight=class_weight)),
-    #     ]
-    # )
+    # model = RocketClassifier(n_kernels=1000)
+    model = RocketClassifier(n_kernels=1000, class_weight=class_weight)
 
     run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{model_name}"
 
@@ -150,7 +121,7 @@ def main():
             # SessionConfig(2024, "United States Paulo Grand Prix", "R"),
             # SessionConfig(2024, "Monaco Paulo Grand Prix", "R"),
         ],
-        drivers=["1"],
+        # drivers=["1"],
         include_weather=False,
     )
 
