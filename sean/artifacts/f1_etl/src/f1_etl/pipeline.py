@@ -1,6 +1,6 @@
 """Main ETL pipeline for safety car dataset creation"""
 
-from typing import Any, Dict, Optional, Optional
+from typing import Any, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -92,15 +92,24 @@ def create_safety_car_dataset(
         f"  Resampling: {resampling_strategy if resampling_strategy else 'disabled'}"
     )
 
+    # Log driver configuration for debugging
+    logger.info("Driver configuration:")
+    logger.info(f"  Global drivers: {config.drivers}")
+    for session in config.sessions:
+        effective_drivers = config.get_effective_drivers(session)
+        logger.info(f"  {session.race}: {effective_drivers}")
+
     # Step 1: Extract raw data
     extractor = RawDataExtractor(config.cache_dir)
     sessions_data = [
         extractor.extract_session(session_config) for session_config in config.sessions
     ]
 
-    # Step 2: Aggregate data with track status alignment
+    # Step 2: Aggregate data with per-session driver filtering
     aggregator = DataAggregator()
-    telemetry_data = aggregator.aggregate_telemetry_data(sessions_data, config.drivers)
+    telemetry_data = aggregator.aggregate_telemetry_data(
+        sessions_data, config, config.sessions
+    )
 
     if telemetry_data.empty:
         raise ValueError("No telemetry data extracted")

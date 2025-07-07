@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from .config import DataConfig, SessionConfig
 from .logging import logger
 
 
@@ -15,9 +16,54 @@ class DataAggregator:
         self.aggregated_data = defaultdict(list)
 
     def aggregate_telemetry_data(
+        self,
+        sessions_data: List[Dict[str, Any]],
+        config: DataConfig,  # NEW: Pass full config instead of just drivers
+        session_configs: List[
+            SessionConfig
+        ],  # NEW: Pass session configs for per-session filtering
+    ) -> pd.DataFrame:
+        """Aggregate telemetry data across sessions with per-session driver filtering"""
+        all_telemetry = []
+
+        for i, session_data in enumerate(sessions_data):
+            session_config = session_configs[i]
+
+            # Get effective drivers for this specific session
+            session_drivers = config.get_effective_drivers(session_config)
+
+            logger.debug(
+                f"Processing session {session_config.race} with drivers: {session_drivers}"
+            )
+
+            session_telemetry = self._merge_session_telemetry(
+                session_data, session_drivers
+            )
+
+            session_telemetry["SessionYear"] = session_data["session_info"]["year"]
+            session_telemetry["SessionRace"] = session_data["session_info"]["race"]
+            session_telemetry["SessionType"] = session_data["session_info"][
+                "session_type"
+            ]
+            session_telemetry["SessionId"] = (
+                f"{session_data['session_info']['year']}_{session_data['session_info']['race']}_{session_data['session_info']['session_type']}"
+            )
+
+            track_status = session_data.get("track_status", pd.DataFrame())
+            t0_date = session_data["session_info"]["t0_date"]
+            session_telemetry = self._align_track_status(
+                session_telemetry, track_status, t0_date
+            )
+
+            all_telemetry.append(session_telemetry)
+
+        return pd.concat(all_telemetry, ignore_index=True)
+
+    # BACKWARDS COMPATIBILITY: Keep old method signature
+    def aggregate_telemetry_data_legacy(
         self, sessions_data: List[Dict[str, Any]], drivers: Optional[List[str]] = None
     ) -> pd.DataFrame:
-        """Aggregate telemetry data across sessions with track status alignment"""
+        """Legacy method - use global driver filter for all sessions"""
         all_telemetry = []
 
         for session_data in sessions_data:
