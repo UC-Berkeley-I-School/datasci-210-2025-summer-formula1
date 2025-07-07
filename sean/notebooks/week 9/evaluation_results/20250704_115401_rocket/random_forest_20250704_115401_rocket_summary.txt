@@ -1,0 +1,86 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: random_forest_20250704_115401_rocket
+Timestamp: 2025-07-04T11:54:20.384574
+Target Class: safety_car
+Test Size: 17.1%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: multi_session_2024_R_6sessions
+Drivers: 1
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 17,032
+Shape: (17032, 50, 9)
+Class Distribution:
+  green: 14,208
+  red: 433
+  safety_car: 1,639
+  vsc: 121
+  vsc_ending: 7
+  yellow: 624
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: random_forest
+Base Estimator: NoneType
+Wrapper: Catch22Classifier
+Custom Weights: True
+Hyperparameters:
+  class_weight: {0: 1.0, 1: 1.0, 2: 5.0, 3: 1.0, 4: 1.0, 5: 1.0, 6: 1.0}
+  estimator: None
+  n_jobs: 1
+  n_kernels: 1000
+  random_state: None
+Class Weights:
+  Class 0: 1.0
+  Class 1: 1.0
+  Class 2: 5.0
+  Class 3: 1.0
+  Class 4: 1.0
+  Class 5: 1.0
+  Class 6: 1.0
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.5690
+F1-Macro: 0.1712
+F1-Weighted: 0.5373
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.1980
+Recall: 0.7092
+F1-Score: 0.3096
+True Positives: 139
+False Negatives: 57 (missed events)
+False Positives: 563 (false alarms)
+True Negatives: 1,696
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.718      0.717      0.717      1754      
+red          0.000      0.000      0.000      433       
+safety_car   0.198      0.709      0.310      196       
+vsc          0.000      0.000      0.000      27        
+vsc_ending   0.000      0.000      0.000      4         
+yellow       0.000      0.000      0.000      41        
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_red  Pred_safety_car  Pred_vsc  Pred_vsc_ending  Pred_yellow
+True_green             1258         0              496         0                0            0
+True_red                411         0               22         0                0            0
+True_safety_car          57         0              139         0                0            0
+True_vsc                  5         0               22         0                0            0
+True_vsc_ending           0         0                4         0                0            0
+True_yellow              22         0               19         0                0            0

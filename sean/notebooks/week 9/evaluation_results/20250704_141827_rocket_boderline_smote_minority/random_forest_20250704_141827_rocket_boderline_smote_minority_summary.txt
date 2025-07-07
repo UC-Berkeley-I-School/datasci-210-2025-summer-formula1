@@ -1,0 +1,94 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: random_forest_20250704_141827_rocket_boderline_smote_minority
+Timestamp: 2025-07-04T14:19:11.267797
+Target Class: safety_car
+Test Size: 17.2%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: multi_session_2024_R_7sessions
+Drivers: 1
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 21,505
+Shape: (21505, 50, 9)
+Class Distribution:
+  green: 18,077
+  red: 1,011
+  safety_car: 1,461
+  vsc: 121
+  vsc_ending: 7
+  yellow: 828
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: random_forest
+Base Estimator: Pipeline
+Wrapper: Direct
+Custom Weights: True
+Hyperparameters:
+  memory: None
+  steps: [('tabularize', Tabularizer()), ('smote', BorderlineSMOTE(k_neighbors=2, m_neighbors=2, random_state=42,
+                sampling_strategy='minority')), ('classify', RocketClassifier(n_kernels=1000))]
+  transform_input: None
+  verbose: False
+  tabularize: Tabularizer()
+  smote: BorderlineSMOTE(k_neighbors=2, m_neighbors=2, random_state=42,
+                sampling_strategy='minority')
+  classify: RocketClassifier(n_kernels=1000)
+  smote__k_neighbors: 2
+  smote__kind: borderline-1
+  smote__m_neighbors: 2
+  smote__random_state: 42
+  smote__sampling_strategy: minority
+  classify__class_weight: None
+  classify__estimator: None
+  classify__n_jobs: 1
+  classify__n_kernels: 1000
+  classify__random_state: None
+Class Weights:
+  Class 0: 1.0
+  Class 1: 1.0
+  Class 2: 5.0
+  Class 3: 1.0
+  Class 4: 1.0
+  Class 5: 1.0
+  Class 6: 1.0
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.8941
+F1-Macro: 0.4356
+F1-Weighted: 0.8666
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.3590
+Recall: 0.3684
+F1-Score: 0.3636
+True Positives: 42
+False Negatives: 72 (missed events)
+False Positives: 75 (false alarms)
+True Negatives: 2,937
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.915      0.973      0.943      2828      
+safety_car   0.359      0.368      0.364      114       
+yellow       0.000      0.000      0.000      184       
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_safety_car  Pred_yellow
+True_green             2753               75            0
+True_safety_car          72               42            0
+True_yellow             184                0            0

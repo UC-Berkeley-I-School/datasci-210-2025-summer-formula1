@@ -1,0 +1,80 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: random_forest_20250704_115401_rocket_external
+Timestamp: 2025-07-04T11:54:58.463501
+Target Class: safety_car
+Test Size: 100.0%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: external_multi_session_2024_R_3sessions
+Drivers: 1
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 9,152
+Shape: (9152, 50, 9)
+Class Distribution:
+  green: 7,915
+  red: 578
+  safety_car: 272
+  yellow: 387
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: random_forest
+Base Estimator: NoneType
+Wrapper: Catch22Classifier
+Custom Weights: True
+Hyperparameters:
+  class_weight: {0: 1.0, 1: 1.0, 2: 5.0, 3: 1.0, 4: 1.0, 5: 1.0, 6: 1.0}
+  estimator: None
+  n_jobs: 1
+  n_kernels: 1000
+  random_state: None
+Class Weights:
+  Class 0: 1.0
+  Class 1: 1.0
+  Class 2: 5.0
+  Class 3: 1.0
+  Class 4: 1.0
+  Class 5: 1.0
+  Class 6: 1.0
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.7952
+F1-Macro: 0.4276
+F1-Weighted: 0.7933
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.1957
+Recall: 0.6434
+F1-Score: 0.3002
+True Positives: 175
+False Negatives: 97 (missed events)
+False Positives: 719 (false alarms)
+True Negatives: 8,161
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.903      0.861      0.881      7915      
+red          0.000      0.000      0.000      578       
+safety_car   0.196      0.643      0.300      272       
+yellow       0.409      0.749      0.529      387       
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_red  Pred_safety_car  Pred_yellow
+True_green             6813         0              691          411
+True_red                552         0               18            8
+True_safety_car          97         0              175            0
+True_yellow              87         0               10          290

@@ -1,0 +1,14 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: random_forest_20250706_114531_random_forest
+Timestamp: 2025-07-06T11:58:32.608681
+Target Class: safety_car
+Test Size: 17.6%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: multi_session_2024_R_5sessions
