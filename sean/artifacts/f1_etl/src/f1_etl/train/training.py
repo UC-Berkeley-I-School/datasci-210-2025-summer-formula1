@@ -193,6 +193,13 @@ def evaluate_on_external_dataset(
         features_used=original_dataset_metadata.features_used,
     )
     external_metadata.scope = f"external_{external_metadata.scope}"
+    
+    # Update resampling info if used for external dataset
+    if resampling_strategy:
+        external_metadata.resampling_strategy = resampling_strategy
+        # The resampling_config would have been captured in external_dataset's config
+        if "config" in external_dataset and "resampling_config" in external_dataset["config"]:
+            external_metadata.resampling_config = external_dataset["config"]["resampling_config"]
 
     # Predict on external dataset
     print("Generating predictions...")

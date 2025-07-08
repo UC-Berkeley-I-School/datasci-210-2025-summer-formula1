@@ -135,6 +135,17 @@ def create_safety_car_dataset(
     elif target_column not in telemetry_data.columns:
         raise ValueError(f"Target column '{target_column}' not found in telemetry data")
 
+    # Capture original class distribution before resampling
+    original_class_distribution = None
+    if resampling_strategy:
+        if target_column == "TrackStatus":
+            original_class_distribution = label_encoder.get_class_distribution(telemetry_data["TrackStatus"])
+        else:
+            # For non-track status targets, calculate distribution manually
+            unique_labels, counts = np.unique(telemetry_data[target_column].dropna(), return_counts=True)
+            original_class_distribution = dict(zip(unique_labels.astype(str), counts.astype(int)))
+        logger.info(f"Original class distribution before resampling: {original_class_distribution}")
+
     # Step 3.5: Apply resampling if requested (BEFORE windowing)
     if resampling_strategy:
         telemetry_data = apply_resampling(
@@ -229,6 +240,8 @@ def create_safety_car_dataset(
         "target_column": target_column,
         "use_onehot_labels": use_onehot_labels,
         "resampling_strategy": resampling_strategy,
+        "resampling_config": resampling_config,
+        "original_class_distribution": original_class_distribution,
         "n_sequences": len(X_final),
         "n_features": X_final.shape[2],
         "n_classes": n_classes,

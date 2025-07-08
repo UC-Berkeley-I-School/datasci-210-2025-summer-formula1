@@ -11,7 +11,7 @@ class DatasetMetadata:
     """Captures dataset configuration and characteristics"""
 
     scope: str
-    sessions_config: Dict[str, Any]
+    sessions_config: List[Dict[str, Any]]
     drivers: List[str]
     include_weather: bool
     window_size: int
@@ -26,10 +26,13 @@ class DatasetMetadata:
     n_features: int
     n_timesteps: int
     feature_names: Optional[List[str]] = None
-    class_distribution: Optional[Dict[str, int]] = None
+    class_distribution: Optional[Dict[str, int]] = None  # Final class distribution after any resampling
     features_used: str = "all"
     is_multivariate: bool = True
     preprocessing_steps: Optional[List[str]] = None
+    resampling_strategy: Optional[str] = None
+    resampling_config: Optional[Dict[str, Any]] = None
+    original_class_distribution: Optional[Dict[str, int]] = None  # Class distribution before resampling
 
 
 @dataclass
@@ -150,6 +153,23 @@ def create_dataset_metadata_from_f1_config(
             preprocessing_steps.append(
                 f"normalized_{processing_config.get('normalization_method', 'unknown')}"
             )
+        if processing_config.get("resampling_strategy"):
+            preprocessing_steps.append(
+                f"resampled_{processing_config.get('resampling_strategy')}"
+            )
+    
+    # Get resampling information
+    resampling_strategy = None
+    resampling_config = None
+    original_class_dist = None
+    
+    if processing_config:
+        resampling_strategy = processing_config.get("resampling_strategy")
+        resampling_config = processing_config.get("resampling_config")
+        
+        # If resampling was applied, try to get original class distribution
+        if resampling_strategy and "original_class_distribution" in processing_config:
+            original_class_dist = processing_config["original_class_distribution"]
 
     return DatasetMetadata(
         scope=scope,
@@ -197,6 +217,9 @@ def create_dataset_metadata_from_f1_config(
         features_used=features_used,
         is_multivariate=len(X.shape) > 2 and X.shape[1] > 1,
         preprocessing_steps=preprocessing_steps,
+        resampling_strategy=resampling_strategy,
+        resampling_config=resampling_config,
+        original_class_distribution=original_class_dist,
     )
 
 
