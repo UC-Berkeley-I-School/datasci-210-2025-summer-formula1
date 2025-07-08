@@ -1,3 +1,10 @@
+## v0.6.0 (2025-07-08)
+
+### Feat
+
+- capture resampling config in metadata
+- enable optional val and test sets
+
 ## v0.5.0 (2025-07-06)
 
 ### Feat
