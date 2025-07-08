@@ -1,0 +1,80 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: catch22_logistic_driver55_20250708_164721_catch22_logistic_driver55_external
+Timestamp: 2025-07-08T16:56:25.902316
+Target Class: safety_car
+Test Size: 100.0%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: external_multi_session_2024_R_2sessions
+Drivers: 55
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 2,806
+Shape: (2806, 50, 9)
+Class Distribution:
+  green: 2,805
+  yellow: 1
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: catch22_logistic_driver55
+Base Estimator: LogisticRegression
+Wrapper: Catch22Classifier
+Custom Weights: False
+Hyperparameters:
+  C: 0.1
+  class_weight: None
+  dual: False
+  fit_intercept: True
+  intercept_scaling: 1
+  l1_ratio: None
+  max_iter: 3000
+  multi_class: deprecated
+  n_jobs: None
+  penalty: l1
+  random_state: 42
+  solver: saga
+  tol: 0.0001
+  verbose: 0
+  warm_start: False
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.9301
+F1-Macro: 0.2410
+F1-Weighted: 0.9635
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.0000
+Recall: 0.0000
+F1-Score: 0.0000
+True Positives: 0
+False Negatives: 0 (missed events)
+False Positives: 191 (false alarms)
+True Negatives: 2,615
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        1.000      0.930      0.964      2805      
+safety_car   0.000      0.000      0.000      0         
+vsc          0.000      0.000      0.000      0         
+yellow       0.000      0.000      0.000      1         
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_safety_car  Pred_vsc  Pred_yellow
+True_green             2610              191         4            0
+True_safety_car           0                0         0            0
+True_vsc                  0                0         0            0
+True_yellow               1                0         0            0
