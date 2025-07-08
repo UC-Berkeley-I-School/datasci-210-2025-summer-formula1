@@ -1,0 +1,73 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: rocket_adasyn_driver77_20250708_161739_rocket_adasyn_driver77_external
+Timestamp: 2025-07-08T16:20:03.213718
+Target Class: safety_car
+Test Size: 100.0%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: external_multi_session_2024_R_2sessions
+Drivers: 77
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 8,560
+Shape: (8560, 50, 9)
+Class Distribution:
+  green: 4,080
+  safety_car: 2,723
+  yellow: 1,757
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: rocket_adasyn_driver77
+Base Estimator: NoneType
+Wrapper: Catch22Classifier
+Custom Weights: False
+Hyperparameters:
+  class_weight: None
+  estimator: None
+  n_jobs: 1
+  n_kernels: 1000
+  random_state: None
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.4076
+F1-Macro: 0.1508
+F1-Weighted: 0.3329
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.2320
+Recall: 0.1113
+F1-Score: 0.1504
+True Positives: 303
+False Negatives: 2,420 (missed events)
+False Positives: 1,003 (false alarms)
+True Negatives: 4,834
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.480      0.779      0.594      4080      
+safety_car   0.232      0.111      0.150      2723      
+vsc          0.000      0.000      0.000      0         
+vsc_ending   0.000      0.000      0.000      0         
+yellow       0.450      0.005      0.010      1757      
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_safety_car  Pred_vsc  Pred_vsc_ending  Pred_yellow
+True_green             3177              599       174              119           11
+True_safety_car        2237              303       101               82            0
+True_vsc                  0                0         0                0            0
+True_vsc_ending           0                0         0                0            0
+True_yellow            1209              404        70               65            9

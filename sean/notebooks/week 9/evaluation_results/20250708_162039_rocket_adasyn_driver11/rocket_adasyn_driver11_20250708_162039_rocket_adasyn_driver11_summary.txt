@@ -1,0 +1,78 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: rocket_adasyn_driver11_20250708_162039_rocket_adasyn_driver11
+Timestamp: 2025-07-08T16:21:36.117495
+Target Class: safety_car
+Test Size: 29.8%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: multi_session_2024_R_7sessions
+Drivers: 11
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 39,153
+Shape: (39153, 50, 9)
+Class Distribution:
+  green: 18,161
+  red: 1,006
+  safety_car: 8,987
+  vsc: 4,840
+  vsc_ending: 5,305
+  yellow: 854
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: rocket_adasyn_driver11
+Base Estimator: NoneType
+Wrapper: Catch22Classifier
+Custom Weights: False
+Hyperparameters:
+  class_weight: None
+  estimator: None
+  n_jobs: 1
+  n_kernels: 1000
+  random_state: None
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.4058
+F1-Macro: 0.1226
+F1-Weighted: 0.3093
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.3410
+Recall: 0.0546
+F1-Score: 0.0942
+True Positives: 148
+False Negatives: 2,561 (missed events)
+False Positives: 286 (false alarms)
+True Negatives: 8,651
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.473      0.840      0.605      5389      
+red          0.000      0.000      0.000      430       
+safety_car   0.341      0.055      0.094      2709      
+vsc          0.003      0.160      0.005      25        
+vsc_ending   0.241      0.016      0.031      2750      
+yellow       0.000      0.000      0.000      343       
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_red  Pred_safety_car  Pred_vsc  Pred_vsc_ending  Pred_yellow
+True_green             4529         0              223       544               93            0
+True_red                276         0                1       149                4            0
+True_safety_car        2283         0              148       235               43            0
+True_vsc                 20         0                1         4                0            0
+True_vsc_ending        2151         0               55       499               45            0
+True_yellow             312         0                6        23                2            0

@@ -1,0 +1,78 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: rocket_smote_driver24_20250708_155615_rocket_smote_driver24
+Timestamp: 2025-07-08T15:57:17.176923
+Target Class: safety_car
+Test Size: 29.8%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: multi_session_2024_R_7sessions
+Drivers: 24
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 39,150
+Shape: (39150, 50, 9)
+Class Distribution:
+  green: 18,143
+  red: 1,000
+  safety_car: 9,018
+  vsc: 4,837
+  vsc_ending: 5,305
+  yellow: 847
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: rocket_smote_driver24
+Base Estimator: NoneType
+Wrapper: Catch22Classifier
+Custom Weights: False
+Hyperparameters:
+  class_weight: None
+  estimator: None
+  n_jobs: 1
+  n_kernels: 1000
+  random_state: None
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.4210
+F1-Macro: 0.1531
+F1-Weighted: 0.3467
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.3385
+Recall: 0.1675
+F1-Score: 0.2241
+True Positives: 461
+False Negatives: 2,292 (missed events)
+False Positives: 901 (false alarms)
+True Negatives: 7,991
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.477      0.807      0.600      5350      
+red          0.000      0.000      0.000      430       
+safety_car   0.338      0.167      0.224      2753      
+vsc          0.009      0.320      0.018      25        
+vsc_ending   0.441      0.042      0.077      2749      
+yellow       0.000      0.000      0.000      338       
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_red  Pred_safety_car  Pred_vsc  Pred_vsc_ending  Pred_yellow
+True_green             4318         0              511       366              106           49
+True_red                241         0              118        63                8            0
+True_safety_car        2057         0              461       215               20            0
+True_vsc                 16         0                0         8                1            0
+True_vsc_ending        2149         0              255       175              116           54
+True_yellow             272         0               17        37               12            0

@@ -1,0 +1,78 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: rocket_smote_driver16_20250708_154600_rocket_smote_driver16
+Timestamp: 2025-07-08T15:47:02.843130
+Target Class: safety_car
+Test Size: 29.8%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: multi_session_2024_R_7sessions
+Drivers: 16
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 39,150
+Shape: (39150, 50, 9)
+Class Distribution:
+  green: 18,143
+  red: 1,000
+  safety_car: 9,018
+  vsc: 4,837
+  vsc_ending: 5,305
+  yellow: 847
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: rocket_smote_driver16
+Base Estimator: NoneType
+Wrapper: Catch22Classifier
+Custom Weights: False
+Hyperparameters:
+  class_weight: None
+  estimator: None
+  n_jobs: 1
+  n_kernels: 1000
+  random_state: None
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.4457
+F1-Macro: 0.1615
+F1-Weighted: 0.3614
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.4391
+Recall: 0.2975
+F1-Score: 0.3547
+True Positives: 819
+False Negatives: 1,934 (missed events)
+False Positives: 1,046 (false alarms)
+True Negatives: 7,846
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.468      0.812      0.594      5350      
+red          0.000      0.000      0.000      430       
+safety_car   0.439      0.297      0.355      2753      
+vsc          0.000      0.000      0.000      25        
+vsc_ending   0.439      0.011      0.021      2749      
+yellow       0.000      0.000      0.000      338       
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_red  Pred_safety_car  Pred_vsc  Pred_vsc_ending  Pred_yellow
+True_green             4342         0              783       199               26            0
+True_red                384         0               39         6                1            0
+True_safety_car        1878         0              819        50                6            0
+True_vsc                 22         0                3         0                0            0
+True_vsc_ending        2377         0              183       160               29            0
+True_yellow             276         0               38        20                4            0
