@@ -1,0 +1,72 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: rocket_scripted_driver20_20250708_134142_rocket_scripted_driver20
+Timestamp: 2025-07-08T13:42:12.461147
+Target Class: safety_car
+Test Size: 17.1%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: multi_session_2024_R_7sessions
+Drivers: 20
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 17,855
+Shape: (17855, 50, 9)
+Class Distribution:
+  green: 15,227
+  red: 578
+  safety_car: 1,265
+  vsc: 94
+  vsc_ending: 3
+  yellow: 688
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: rocket_scripted_driver20
+Base Estimator: NoneType
+Wrapper: Catch22Classifier
+Custom Weights: False
+Hyperparameters:
+  class_weight: None
+  estimator: None
+  n_jobs: 1
+  n_kernels: 1000
+  random_state: None
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.9438
+F1-Macro: 0.4259
+F1-Weighted: 0.9326
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.4355
+Recall: 0.2368
+F1-Score: 0.3068
+True Positives: 27
+False Negatives: 87 (missed events)
+False Positives: 35 (false alarms)
+True Negatives: 2,430
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.956      0.986      0.971      2441      
+safety_car   0.435      0.237      0.307      114       
+yellow       0.000      0.000      0.000      24        
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_safety_car  Pred_yellow
+True_green             2407               34            0
+True_safety_car          87               27            0
+True_yellow              23                1            0

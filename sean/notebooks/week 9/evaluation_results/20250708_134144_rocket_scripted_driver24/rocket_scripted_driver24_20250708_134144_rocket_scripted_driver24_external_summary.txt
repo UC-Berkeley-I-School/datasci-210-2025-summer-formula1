@@ -1,0 +1,71 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: rocket_scripted_driver24_20250708_134144_rocket_scripted_driver24_external
+Timestamp: 2025-07-08T13:43:19.666633
+Target Class: safety_car
+Test Size: 100.0%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: external_multi_session_2024_R_2sessions
+Drivers: 24
+Window Size: 50
+Prediction Horizon: 100
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 4,679
+Shape: (4679, 50, 9)
+Class Distribution:
+  green: 4,046
+  safety_car: 450
+  yellow: 183
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: rocket_scripted_driver24
+Base Estimator: NoneType
+Wrapper: Catch22Classifier
+Custom Weights: False
+Hyperparameters:
+  class_weight: None
+  estimator: None
+  n_jobs: 1
+  n_kernels: 1000
+  random_state: None
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.6950
+F1-Macro: 0.2693
+F1-Weighted: 0.7419
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.4578
+Recall: 0.1689
+F1-Score: 0.2468
+True Positives: 76
+False Negatives: 374 (missed events)
+False Positives: 90 (false alarms)
+True Negatives: 4,139
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.882      0.785      0.831      4046      
+red          0.000      0.000      0.000      0         
+safety_car   0.458      0.169      0.247      450       
+yellow       0.000      0.000      0.000      183       
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_red  Pred_safety_car  Pred_yellow
+True_green             3176       782               88            0
+True_red                  0         0                0            0
+True_safety_car         374         0               76            0
+True_yellow              52       129                2            0
