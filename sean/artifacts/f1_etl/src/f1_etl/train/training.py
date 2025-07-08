@@ -139,6 +139,7 @@ def evaluate_on_external_dataset(
     class_names,
     evaluator,
     resampling_strategy=None,
+    resampling_config=None,
 ):
     """
     Evaluate a trained model on a completely different dataset (e.g., different race)
@@ -153,6 +154,11 @@ def evaluate_on_external_dataset(
         resampling_strategy: Optional resampling strategy for external dataset
                            ('adasyn', 'smote', 'borderline_smote', None)
                            Note: Usually you want None to evaluate on natural distribution
+        resampling_config : dict, optional
+            Custom sampling configuration. Examples:
+            - {'2': 1000000}: resample class 2 to have 1M samples
+            - {'2': 0.5}: resample class 2 to 50% of majority class
+            - 'not majority': resample all but the majority class
 
     Returns:
         Evaluation results on external dataset
@@ -176,7 +182,8 @@ def evaluate_on_external_dataset(
         normalize=True,
         normalization_method="per_sequence",
         target_column="TrackStatus",
-        resampling_strategy=resampling_strategy,  # Add resampling support
+        resampling_strategy=resampling_strategy,
+        resampling_config=resampling_config,
         enable_debug=False,
     )
 
@@ -193,7 +200,7 @@ def evaluate_on_external_dataset(
         features_used=original_dataset_metadata.features_used,
     )
     external_metadata.scope = f"external_{external_metadata.scope}"
-    
+
     # Update resampling info if used for external dataset
     if resampling_strategy:
         external_metadata.resampling_strategy = resampling_strategy
