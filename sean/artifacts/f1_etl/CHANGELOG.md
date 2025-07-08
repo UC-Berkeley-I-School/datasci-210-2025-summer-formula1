@@ -1,3 +1,9 @@
+## v0.6.1 (2025-07-08)
+
+### Fix
+
+- pass resampling_config during x-evals
+
 ## v0.6.0 (2025-07-08)
 
 ### Feat
