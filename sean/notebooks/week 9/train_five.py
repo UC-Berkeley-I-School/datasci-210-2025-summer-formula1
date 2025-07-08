@@ -35,10 +35,10 @@ def parse_args():
 
 def main():
     args = parse_args()
-    
+
     # Convert driver numbers to strings and use empty list if none specified
     drivers = [str(d) for d in args.drivers] if args.drivers else []
-    
+
     # 1. Load dataset
     data_config = DataConfig(
         sessions=[
@@ -71,11 +71,11 @@ def main():
     )
 
     # 3. Prepare data
-    splits = prepare_data_with_validation(dataset, val_size=0.15, test_size=0.15)
+    splits = prepare_data_with_validation(dataset, val_size=0.0, test_size=0.0)
     class_names = list(dataset["label_encoder"].class_to_idx.keys())
 
     # 5. Train model
-    model_name = "rocket_sc_smote_train_sc_eval_driver1"
+    model_name = f"rocket_smote_driver{"_".join(drivers)}"
     model = RocketClassifier(n_kernels=1000)
 
     run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{model_name}"
@@ -116,6 +116,7 @@ def main():
         model_metadata=model_metadata,
         class_names=class_names,
         evaluator=evaluator,
+        resampling_strategy=dataset_metadata['resampling_strategy']
     )
 
     # 7. Compare results

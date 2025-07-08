@@ -25,19 +25,35 @@ def main():
     data_config = DataConfig(
         # sessions=create_multi_session_configs(year=2023, session_types=['R'], include_testing=False),
         sessions=[
-            SessionConfig(2024, "Qatar Grand Prix", "R", drivers=["27", "31", "43", "23", "77", "11"]),
-            SessionConfig(2024, "Chinese Grand Prix", "R", drivers=["77", "18", "3", "20", "22"]),
-            # SessionConfig(2024, "Canadian Grand Prix", "R", drivers=["2", "55", "23"]),
-            SessionConfig(2024, "Mexico City Grand Prix", "R", drivers=["22", "23"]),
-            SessionConfig(2024, "São Paulo Grand Prix", "R", drivers=["27", "43", "55"]),
-            SessionConfig(2024, "Miami Grand Prix", "R", drivers=["1", "20", "2"]),
-            # SessionConfig(2024, "Saudi Arabian Grand Prix", "R", drivers=["18"]),
-            SessionConfig(2024, "United States Grand Prix", "R", drivers=["44"]),
-            SessionConfig(2024, "Monaco Grand Prix", "R", drivers=["11", "20", "27"]),
+            SessionConfig(2024, "Qatar Grand Prix", "R"),
+            SessionConfig(2024, "Chinese Grand Prix", "R"),
+            # SessionConfig(2024, "Canadian Grand Prix", "R"),
+            SessionConfig(2024, "Mexico City Grand Prix", "R"),
+            SessionConfig(2024, "São Paulo Grand Prix", "R"),
+            SessionConfig(2024, "Miami Grand Prix", "R"),
+            # SessionConfig(2024, "Saudi Arabian Grand Prix", "R"),
+            SessionConfig(2024, "United States Grand Prix", "R"),
+            SessionConfig(2024, "Monaco Grand Prix", "R"),
         ],
-        # drivers=[],  # <-- optionally filter down drivers
+        drivers=["1"],  # <-- optionally filter down drivers
         include_weather=False,
     )
+    # data_config = DataConfig(
+    #     # sessions=create_multi_session_configs(year=2023, session_types=['R'], include_testing=False),
+    #     sessions=[
+    #         SessionConfig(2024, "Qatar Grand Prix", "R", drivers=["27", "31", "43", "23", "77", "11"]),
+    #         SessionConfig(2024, "Chinese Grand Prix", "R", drivers=["77", "18", "3", "20", "22"]),
+    #         # SessionConfig(2024, "Canadian Grand Prix", "R", drivers=["2", "55", "23"]),
+    #         SessionConfig(2024, "Mexico City Grand Prix", "R", drivers=["22", "23"]),
+    #         SessionConfig(2024, "São Paulo Grand Prix", "R", drivers=["27", "43", "55"]),
+    #         SessionConfig(2024, "Miami Grand Prix", "R", drivers=["1", "20", "2"]),
+    #         # SessionConfig(2024, "Saudi Arabian Grand Prix", "R", drivers=["18"]),
+    #         SessionConfig(2024, "United States Grand Prix", "R", drivers=["44"]),
+    #         SessionConfig(2024, "Monaco Grand Prix", "R", drivers=["11", "20", "27"]),
+    #     ],
+    #     # drivers=[],  # <-- optionally filter down drivers
+    #     include_weather=False,
+    # )
 
     dataset = create_safety_car_dataset(
         config=data_config,
@@ -61,19 +77,19 @@ def main():
     class_names = list(dataset["label_encoder"].class_to_idx.keys())
 
     # 4. Define class weights
-    y_enc = dataset["label_encoder"]
-    class_weight = {
-        y_enc.class_to_idx["green"]: 1.0,
-        y_enc.class_to_idx["red"]: 1.0,
-        y_enc.class_to_idx["safety_car"]: 5.0,
-        y_enc.class_to_idx["unknown"]: 1.0,
-        y_enc.class_to_idx["vsc"]: 1.0,
-        y_enc.class_to_idx["vsc_ending"]: 1.0,
-        y_enc.class_to_idx["yellow"]: 1.0,
-    }
+    # y_enc = dataset["label_encoder"]
+    # class_weight = {
+    #     y_enc.class_to_idx["green"]: 1.0,
+    #     y_enc.class_to_idx["red"]: 1.0,
+    #     y_enc.class_to_idx["safety_car"]: 5.0,
+    #     y_enc.class_to_idx["unknown"]: 1.0,
+    #     y_enc.class_to_idx["vsc"]: 1.0,
+    #     y_enc.class_to_idx["vsc_ending"]: 1.0,
+    #     y_enc.class_to_idx["yellow"]: 1.0,
+    # }
 
     # 5. Train model
-    model_name = "rocket_sc_smote_sc_drivers"
+    model_name = "rocket_sc_smote_train_sc_eval_driver1"
     # model_name = "rocket_with_imb_pipeline"
     # model_name = "random_forest"
 
@@ -81,8 +97,8 @@ def main():
     # models = create_basic_models()
     # model = models[model_name]
 
-    # model = RocketClassifier(n_kernels=1000)
-    model = RocketClassifier(n_kernels=1000, class_weight=class_weight)
+    model = RocketClassifier(n_kernels=1000)
+    # model = RocketClassifier(n_kernels=1000, class_weight=class_weight)
 
     run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{model_name}"
 
@@ -108,20 +124,18 @@ def main():
 
     # 6. Evaluate on external dataset
     external_config = DataConfig(
-        # sessions=create_multi_session_configs(year=2024, session_types=['R'], include_testing=False),
-        # sessions=[SessionConfig(2024, "Saudia Arabian Grand Prix", "R")],
         sessions=[
             # SessionConfig(2024, "Qatar Grand Prix", "R"),
             # SessionConfig(2024, "Chinese Grand Prix", "R"),
             SessionConfig(2024, "Canadian Grand Prix", "R"),
             # SessionConfig(2024, "Mexico City Grand Prix", "R"),
             # SessionConfig(2024, "São Paulo Grand Prix", "R"),
-            # SessionConfig(2024, "Miami Paulo Grand Prix", "R"),
-            SessionConfig(2024, "Saudia Arabian Grand Prix", "R"),
-            # SessionConfig(2024, "United States Paulo Grand Prix", "R"),
-            # SessionConfig(2024, "Monaco Paulo Grand Prix", "R"),
+            # SessionConfig(2024, "Miami Grand Prix", "R"),
+            SessionConfig(2024, "Saudi Arabian Grand Prix", "R"),
+            # SessionConfig(2024, "United States Grand Prix", "R"),
+            # SessionConfig(2024, "Monaco Grand Prix", "R"),
         ],
-        # drivers=["1"],
+        drivers=["1"],  # <-- optionally filter down drivers
         include_weather=False,
     )
 
