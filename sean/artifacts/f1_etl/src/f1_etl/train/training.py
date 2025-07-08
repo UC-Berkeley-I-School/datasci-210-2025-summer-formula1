@@ -19,7 +19,7 @@ def train_and_validate_model(
     validate_during_training=True,
 ):
     """
-    Train model with validation monitoring
+    Train model with optional validation and test evaluation
 
     Args:
         model: Model to train
@@ -28,13 +28,25 @@ def train_and_validate_model(
         evaluator: ModelEvaluationSuite instance
         dataset_metadata: DatasetMetadata instance
         model_metadata: ModelMetadata instance
-        validate_during_training: Whether to evaluate on validation set
+        validate_during_training: Whether to evaluate on validation set (if available)
 
     Returns:
-        Dictionary with training results and validation performance
+        Dictionary with training results and optional validation/test performance
     """
+    # Determine available splits
+    has_val = splits["X_val"] is not None and splits["y_val"] is not None
+    has_test = splits["X_test"] is not None and splits["y_test"] is not None
+
+    split_type = "TRAINING"
+    if has_val and has_test:
+        split_type = "TRAINING WITH VALIDATION AND TEST"
+    elif has_val:
+        split_type = "TRAINING WITH VALIDATION"
+    elif has_test:
+        split_type = "TRAINING WITH TEST"
+
     print(f"\n{'=' * 80}")
-    print(f"TRAINING WITH VALIDATION: {model_metadata.model_type}")
+    print(f"{split_type}: {model_metadata.model_type}")
     print(f"{'=' * 80}")
 
     # Train the model
@@ -43,8 +55,8 @@ def train_and_validate_model(
 
     results = {}
 
-    # Evaluate on validation set if requested
-    if validate_during_training:
+    # Evaluate on validation set if requested and available
+    if validate_during_training and has_val:
         print("\nEvaluating on validation set...")
         val_pred = model.predict(splits["X_val"])
 
@@ -64,26 +76,57 @@ def train_and_validate_model(
             "predictions": val_pred.tolist(),
             "y_true": splits["y_val"].tolist(),
         }
+    elif validate_during_training and not has_val:
+        print("\nValidation set not available (val_size=0.0)")
 
-    # Full evaluation on test set
-    print("\nRunning full evaluation on test set...")
-    test_results = evaluator.evaluate_model(
-        model=model,
-        model_name=model_metadata.model_type,
-        X_train=splits["X_train"],  # Pass train data for metadata
-        X_test=splits["X_test"],
-        y_train=splits["y_train"],
-        y_test=splits["y_test"],
-        dataset_metadata=dataset_metadata,
-        model_metadata=model_metadata,
-        class_names=list(class_names),
-        target_class="safety_car",
-        save_results=True,
-        evaluation_suffix="",  # No suffix for primary evaluation
-    )
+    # Full evaluation on test set if available
+    if has_test:
+        print("\nRunning full evaluation on test set...")
+        test_results = evaluator.evaluate_model(
+            model=model,
+            model_name=model_metadata.model_type,
+            X_train=splits["X_train"],  # Pass train data for metadata
+            X_test=splits["X_test"],
+            y_train=splits["y_train"],
+            y_test=splits["y_test"],
+            dataset_metadata=dataset_metadata,
+            model_metadata=model_metadata,
+            class_names=list(class_names),
+            target_class="safety_car",
+            save_results=True,
+            evaluation_suffix="",  # No suffix for primary evaluation
+        )
+        results["test"] = test_results
+    else:
+        print("\nTest set not available (test_size=0.0)")
 
-    results["test"] = test_results
+        # If no test set, optionally evaluate on validation set as final evaluation
+        if has_val and not validate_during_training:
+            print("\nUsing validation set for final evaluation...")
+            val_results = evaluator.evaluate_model(
+                model=model,
+                model_name=model_metadata.model_type,
+                X_train=splits["X_train"],
+                X_test=splits["X_val"],
+                y_train=splits["y_train"],
+                y_test=splits["y_val"],
+                dataset_metadata=dataset_metadata,
+                model_metadata=model_metadata,
+                class_names=list(class_names),
+                target_class="safety_car",
+                save_results=True,
+                evaluation_suffix="_val",  # Suffix to distinguish from test evaluation
+            )
+            results["validation_as_test"] = val_results
+
     results["model"] = model  # Store trained model
+    results["split_configuration"] = {
+        "has_validation": has_val,
+        "has_test": has_test,
+        "train_size": len(splits["y_train"]),
+        "val_size": len(splits["y_val"]) if has_val else 0,
+        "test_size": len(splits["y_test"]) if has_test else 0,
+    }
 
     return results
 
@@ -220,13 +263,23 @@ def compare_performance_across_datasets(training_results, external_results):
             f"{training_results['validation']['f1_macro']:<10.4f} {'N/A':<10}"
         )
 
-    # Test performance (same race holdout)
-    test_metrics = training_results["test"]["metrics"]
-    print(
-        f"{'Test (same race)':<20} {test_metrics['overall']['accuracy']:<10.4f} "
-        f"{test_metrics['overall']['f1_macro']:<10.4f} "
-        f"{test_metrics['target_class_metrics']['f1'] if test_metrics['target_class_metrics'] else 0:<10.4f}"
-    )
+    # Test performance (same race holdout) if available
+    if "test" in training_results:
+        test_metrics = training_results["test"]["metrics"]
+        print(
+            f"{'Test (same race)':<20} {test_metrics['overall']['accuracy']:<10.4f} "
+            f"{test_metrics['overall']['f1_macro']:<10.4f} "
+            f"{test_metrics['target_class_metrics']['f1'] if test_metrics['target_class_metrics'] else 0:<10.4f}"
+        )
+
+    # Validation used as test if no test set was available
+    if "validation_as_test" in training_results:
+        val_test_metrics = training_results["validation_as_test"]["metrics"]
+        print(
+            f"{'Val as Test':<20} {val_test_metrics['overall']['accuracy']:<10.4f} "
+            f"{val_test_metrics['overall']['f1_macro']:<10.4f} "
+            f"{val_test_metrics['target_class_metrics']['f1'] if val_test_metrics['target_class_metrics'] else 0:<10.4f}"
+        )
 
     # External test performance (different race)
     ext_metrics = external_results["metrics"]
@@ -235,3 +288,13 @@ def compare_performance_across_datasets(training_results, external_results):
         f"{ext_metrics['overall']['f1_macro']:<10.4f} "
         f"{ext_metrics['target_class_metrics']['f1'] if ext_metrics['target_class_metrics'] else 0:<10.4f}"
     )
+
+    # Print split configuration info
+    if "split_configuration" in training_results:
+        config = training_results["split_configuration"]
+        print("\nSplit Configuration:")
+        print(f"  Train samples: {config['train_size']:,}")
+        if config["has_validation"]:
+            print(f"  Val samples:   {config['val_size']:,}")
+        if config["has_test"]:
+            print(f"  Test samples:  {config['test_size']:,}")
