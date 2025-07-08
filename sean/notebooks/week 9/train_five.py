@@ -116,7 +116,8 @@ def main():
         model_metadata=model_metadata,
         class_names=class_names,
         evaluator=evaluator,
-        resampling_strategy=dataset_metadata['resampling_strategy']
+        resampling_strategy=dataset_metadata.resampling_strategy,
+        resampling_config=dataset_metadata.resampling_config,
     )
 
     # 7. Compare results
