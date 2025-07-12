@@ -1,0 +1,17 @@
+[project]
+name = "model-service"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Sean Sica", email = "23294618+seansica@users.noreply.github.com" }
+]
+requires-python = ">=3.11"
+dependencies = []
+
+[project.scripts]
+model-service = "model_service:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
