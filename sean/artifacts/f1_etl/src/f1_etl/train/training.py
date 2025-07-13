@@ -140,6 +140,7 @@ def evaluate_on_external_dataset(
     evaluator,
     resampling_strategy=None,
     resampling_config=None,
+    original_dataset_config=None
 ):
     """
     Evaluate a trained model on a completely different dataset (e.g., different race)
@@ -159,13 +160,30 @@ def evaluate_on_external_dataset(
             - {'2': 1000000}: resample class 2 to have 1M samples
             - {'2': 0.5}: resample class 2 to 50% of majority class
             - 'not majority': resample all but the majority class
-
+        original_dataset_config : dict, optional
+            The config from the original training dataset to ensure matching preprocessing
     Returns:
         Evaluation results on external dataset
     """
     print(f"\n{'=' * 80}")
     print("EXTERNAL DATASET EVALUATION")
     print(f"{'=' * 80}")
+
+    # Extract preprocessing parameters from original dataset if available
+    feature_transform = "none"
+    pca_components = None
+    pca_variance_threshold = 0.95
+    normalization_method = "per_sequence"
+    if original_dataset_config:
+            feature_transform = original_dataset_config.get("feature_transform", "none")
+            pca_components = original_dataset_config.get("pca_n_components", None)
+            pca_variance_threshold = original_dataset_config.get("pca_variance_threshold", 0.95)
+            normalization_method = original_dataset_config.get("normalization_method", "per_sequence")
+            
+            print(f"Using preprocessing from training dataset:")
+            print(f"  Feature transform: {feature_transform}")
+            if feature_transform == "pca":
+                print(f"  PCA components: {pca_components}")
 
     # Load external dataset with same preprocessing as training
     print("Loading external dataset...")
@@ -180,10 +198,13 @@ def evaluate_on_external_dataset(
         handle_missing=True,
         missing_strategy="forward_fill",
         normalize=True,
-        normalization_method="per_sequence",
+        normalization_method=normalization_method,
         target_column="TrackStatus",
         resampling_strategy=resampling_strategy,
         resampling_config=resampling_config,
+        feature_transform=feature_transform,
+        pca_components=pca_components,
+        pca_variance_threshold=pca_variance_threshold,
         enable_debug=False,
     )
 
@@ -205,8 +226,13 @@ def evaluate_on_external_dataset(
     if resampling_strategy:
         external_metadata.resampling_strategy = resampling_strategy
         # The resampling_config would have been captured in external_dataset's config
-        if "config" in external_dataset and "resampling_config" in external_dataset["config"]:
-            external_metadata.resampling_config = external_dataset["config"]["resampling_config"]
+        if (
+            "config" in external_dataset
+            and "resampling_config" in external_dataset["config"]
+        ):
+            external_metadata.resampling_config = external_dataset["config"][
+                "resampling_config"
+            ]
 
     # Predict on external dataset
     print("Generating predictions...")
