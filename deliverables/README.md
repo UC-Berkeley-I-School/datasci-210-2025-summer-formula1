@@ -10,7 +10,7 @@ The system processes time series data from Formula 1 sessions, where each time w
 
 ## Component Architecture
 
-### Web Application (Owner: Justin)
+## Web Application (Owner: Justin)
 
 The web application serves as the user-facing interface for our prediction system. Built with Flask, it provides a server-side rendered dashboard that visualizes both the current race state and our model's predictions in real-time.
 
@@ -20,13 +20,13 @@ The application operates as a read-only demonstration interface with no user con
 
 For deployment, we're considering two approaches: either generating static assets using Frozen Flask and hosting them on a CDN for optimal performance, or running the Flask application directly on a container platform like ECS or EKS. The choice will depend on whether we need dynamic server-side functionality beyond what can be pre-rendered.
 
-### REST API Service (Owner: Thomas)
+## REST API Service (Owner: Thomas)
 
 The REST API serves as the data and prediction layer of our system, built with FastAPI to provide high-performance endpoints for the web application. This service manages all 20 driver models in memory, eliminating model loading latency during prediction requests.
 
 The API exposes three primary endpoints that the frontend consumes:
 
-#### Get Available Sessions Endpoint
+### Get Available Sessions Endpoint
 
 The sessions endpoint provides a discovery mechanism for the frontend to determine which F1 sessions are available for analysis:
 
@@ -61,7 +61,7 @@ The response structure looks like this:
 }
 ```
 
-#### Make Predictions Endpoint
+### Make Predictions Endpoint
 
 The prediction endpoint is the core of our API, accepting a session identifier and returning predictions for all drivers across all time windows:
 
@@ -80,9 +80,37 @@ The API retrieves all telemetry data for the specified session from the database
 - `y_pred`: The model's predicted class (0 or 1) for each time window
 - `y_proba`: The probability distribution as `[green_proba, red_proba, safety_car_proba, vsc_proba, vsc_ending_proba, yellow_proba]`
 
+The response structure looks like this:
+
+```
+{
+{
+  "session_id": string,
+  "predictions": [
+    {
+      "driver_number": int,
+      "driver_abbreviation": string,
+      "y_true": [0, 1, 0, ...],
+      "y_pred": [0, 1, 0, ...],
+      "y_proba": [
+        [
+          0.8159391667344977,
+          0.06450007842344226,
+          0.0425998142957964,
+          0.0010834984948102642,
+          3.009032714021747e-05,
+          0.07584735172431324
+        ],
+        [...]
+      ]
+    }
+  ]
+}
+```
+
 This design allows the frontend to display both the model's confidence (via probabilities) and its accuracy (by comparing predictions to ground truth).
 
-#### Get Telemetry Endpoint
+### Get Telemetry Endpoint
 
 The telemetry endpoint provides positional data needed for the track visualization:
 
@@ -90,9 +118,28 @@ The telemetry endpoint provides positional data needed for the track visualizati
 GET /api/v1/telemetry?session_id=2024_Saudi Arabian Grand Prix_R
 ```
 
-This endpoint returns X, Y, and Z coordinates for each driver at each time window, enabling the frontend to animate driver movements on the track. The coordinates are extracted from the stored telemetry data and formatted for easy consumption by the visualization layer.
+This endpoint returns X, Y, and Z coordinates for each driver at each time window, enabling the frontend to animate driver movements on the track. The coordinates are extracted from the stored telemetry data and formatted for easy consumption by the webapp.
 
-### Database & ETL Pipeline (Owner: Dylan)
+The response structure looks like this:
+```
+{
+  "coordinates": [
+    {
+      "driver_number": int,
+      "driver_abbreviation": string,
+      "coordinates": [
+        {
+          "X": float,
+          "Y": float,
+          "Z": float
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Database & ETL Pipeline (Owner: Dylan)
 
 The database component serves as the foundation for our time series data storage and retrieval. Using PostgreSQL with the TimescaleDB extension, it's optimized for time-series workloads while maintaining the flexibility of a relational database.
 
