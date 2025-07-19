@@ -1,94 +1,142 @@
--- Database Functions for F1 Telemetry System
-
--- Function to batch insert telemetry data
-CREATE OR REPLACE FUNCTION insert_telemetry_batch(
+-- Function to efficiently insert time series windows in batches
+CREATE OR REPLACE FUNCTION insert_time_series_batch(
     p_session_id VARCHAR(100),
-    p_driver_id VARCHAR(20),
-    p_telemetry_data JSONB
+    p_driver_number INTEGER,
+    p_windows JSONB
 ) RETURNS INTEGER AS $$
 DECLARE
     inserted_count INTEGER := 0;
-    telemetry_point JSONB;
+    window_data JSONB;
+    window_idx INTEGER := 0;
 BEGIN
-    FOR telemetry_point IN SELECT * FROM jsonb_array_elements(p_telemetry_data)
+    FOR window_data IN SELECT * FROM jsonb_array_elements(p_windows)
     LOOP
-        INSERT INTO telemetry (
-            time, session_id, driver_id, speed, rpm, ngear, throttle, brake, drs,
-            x, y, z, status, session_time, source, raw_data
+        INSERT INTO time_series_windows (
+            session_id,
+            driver_number,
+            window_index,
+            start_time,
+            end_time,
+            prediction_time,
+            feature_matrix,
+            y_true,
+            sequence_length,
+            prediction_horizon,
+            features_used
         ) VALUES (
-            COALESCE((telemetry_point->>'Date')::TIMESTAMPTZ, NOW()),
             p_session_id,
-            p_driver_id,
-            (telemetry_point->>'Speed')::DECIMAL,
-            (telemetry_point->>'RPM')::DECIMAL,
-            (telemetry_point->>'nGear')::INTEGER,
-            (telemetry_point->>'Throttle')::DECIMAL,
-            (telemetry_point->>'Brake')::BOOLEAN,
-            (telemetry_point->>'DRS')::INTEGER,
-            (telemetry_point->>'X')::DECIMAL,
-            (telemetry_point->>'Y')::DECIMAL,
-            (telemetry_point->>'Z')::DECIMAL,
-            (telemetry_point->>'Status')::VARCHAR,
-            (telemetry_point->>'SessionTime')::INTERVAL,
-            COALESCE((telemetry_point->>'Source')::VARCHAR, 'api'),
-            telemetry_point
-        );
+            p_driver_number,
+            window_idx,
+            (window_data->>'start_time')::TIMESTAMPTZ,
+            (window_data->>'end_time')::TIMESTAMPTZ,
+            (window_data->>'prediction_time')::TIMESTAMPTZ,
+            window_data->'feature_matrix',
+            (window_data->>'y_true')::INTEGER,
+            (window_data->>'sequence_length')::INTEGER,
+            (window_data->>'prediction_horizon')::INTEGER,
+            ARRAY(SELECT jsonb_array_elements_text(window_data->'features_used'))
+        )
+        ON CONFLICT (session_id, driver_number, window_index) DO NOTHING;
+        
         inserted_count := inserted_count + 1;
+        window_idx := window_idx + 1;
     END LOOP;
     
     RETURN inserted_count;
 END;
 $$ LANGUAGE plpgsql;
 
--- Function to create sessions
-CREATE OR REPLACE FUNCTION create_session(
+-- Function to insert telemetry coordinates
+CREATE OR REPLACE FUNCTION insert_telemetry_coordinates_batch(
     p_session_id VARCHAR(100),
-    p_race_name VARCHAR(200),
-    p_session_type VARCHAR(20),
-    p_track_name VARCHAR(200) DEFAULT NULL,
-    p_start_time TIMESTAMPTZ DEFAULT NOW(),
-    p_metadata JSONB DEFAULT '{}'
-) RETURNS BOOLEAN AS $$
-BEGIN
-    INSERT INTO sessions (session_id, race_name, session_type, track_name, start_time, metadata)
-    VALUES (p_session_id, p_race_name, p_session_type, p_track_name, p_start_time, p_metadata)
-    ON CONFLICT (session_id) DO UPDATE SET
-        race_name = EXCLUDED.race_name,
-        session_type = EXCLUDED.session_type,
-        track_name = EXCLUDED.track_name,
-        start_time = EXCLUDED.start_time,
-        metadata = EXCLUDED.metadata;
-    
-    RETURN TRUE;
-END;
-$$ LANGUAGE plpgsql;
-
--- Function to store predictions
-CREATE OR REPLACE FUNCTION store_predictions(
-    p_session_id VARCHAR(100),
-    p_predictions JSONB,
-    p_model_version VARCHAR(50) DEFAULT 'v1.0'
+    p_driver_number INTEGER,
+    p_coordinates JSONB
 ) RETURNS INTEGER AS $$
 DECLARE
     inserted_count INTEGER := 0;
-    prediction JSONB;
+    coord_data JSONB;
+    coord_idx INTEGER := 0;
 BEGIN
-    FOR prediction IN SELECT * FROM jsonb_array_elements(p_predictions)
+    FOR coord_data IN SELECT * FROM jsonb_array_elements(p_coordinates)
     LOOP
-        INSERT INTO predictions (
-            session_id, driver_id, model_version, predicted_track_status,
-            confidence, model_metadata
+        INSERT INTO telemetry_coordinates (
+            session_id,
+            driver_number,
+            window_index,
+            x,
+            y,
+            z
         ) VALUES (
             p_session_id,
-            prediction->>'driver_id',
-            p_model_version,
-            prediction->>'predicted_track_status',
-            (prediction->>'confidence')::DECIMAL,
-            prediction->'metadata'
-        );
+            p_driver_number,
+            coord_idx,
+            (coord_data->>'X')::DECIMAL,
+            (coord_data->>'Y')::DECIMAL,
+            (coord_data->>'Z')::DECIMAL
+        )
+        ON CONFLICT (session_id, driver_number, window_index) DO NOTHING;
+        
         inserted_count := inserted_count + 1;
+        coord_idx := coord_idx + 1;
     END LOOP;
     
     RETURN inserted_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get session summary
+CREATE OR REPLACE FUNCTION get_session_summary(p_session_id VARCHAR(100))
+RETURNS TABLE (
+    session_id VARCHAR(100),
+    year INTEGER,
+    race_name VARCHAR(200),
+    session_type VARCHAR(20),
+    session_date TIMESTAMPTZ,
+    driver_count BIGINT,
+    window_count BIGINT
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        s.session_id,
+        s.year,
+        s.race_name,
+        s.session_type,
+        s.session_date,
+        COUNT(DISTINCT tsw.driver_number) as driver_count,
+        COUNT(*) as window_count
+    FROM sessions s
+    LEFT JOIN time_series_windows tsw ON s.session_id = tsw.session_id
+    WHERE s.session_id = p_session_id
+    GROUP BY s.session_id, s.year, s.race_name, s.session_type, s.session_date;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get predictions data for API
+CREATE OR REPLACE FUNCTION get_predictions_data(p_session_id VARCHAR(100))
+RETURNS TABLE (
+    driver_number INTEGER,
+    driver_abbreviation VARCHAR(3),
+    window_data JSONB
+) AS $$
+BEGIN
+    RETURN QUERY
+    SELECT 
+        d.driver_number,
+        d.driver_abbreviation,
+        jsonb_agg(
+            jsonb_build_object(
+                'window_index', tsw.window_index,
+                'feature_matrix', tsw.feature_matrix,
+                'y_true', tsw.y_true,
+                'start_time', tsw.start_time,
+                'end_time', tsw.end_time,
+                'prediction_time', tsw.prediction_time
+            ) ORDER BY tsw.window_index
+        ) as window_data
+    FROM time_series_windows tsw
+    JOIN drivers d ON tsw.driver_number = d.driver_number
+    WHERE tsw.session_id = p_session_id
+    GROUP BY d.driver_number, d.driver_abbreviation;
 END;
 $$ LANGUAGE plpgsql;

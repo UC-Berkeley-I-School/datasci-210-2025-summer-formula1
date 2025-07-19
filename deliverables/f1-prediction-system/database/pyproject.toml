@@ -1,0 +1,24 @@
+[project]
+name = "database"
+version = "0.1.0"
+description = "F1 telemetry ETL for TimescaleDB"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "f1-etl>=0.6.1",
+    "fastf1>=3.6.0",
+    "numpy>=2.2.6",
+    "pandas>=2.3.1",
+    "psycopg2-binary>=2.9.10",
+    "tqdm>=4.67.1",
+]
+
+[tool.uv]
+dev-dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = []
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
