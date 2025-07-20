@@ -157,18 +157,18 @@ def process_session_driver_with_features(session_id, driver_number, indices, met
                     meta['features_used']
                 ))
                 
-                # Insert features
+                # Insert features - flatten the 2D array to 1D for storage
                 # X[global_idx] shape is (n_timesteps, n_features)
-                feature_matrix = X[global_idx].tolist()  # Convert to nested list
+                feature_values = X[global_idx].flatten().tolist()  # Flatten to 1D
                 
                 cursor.execute("""
                     INSERT INTO window_features 
-                    (session_id, driver_number, window_index, feature_matrix)
+                    (session_id, driver_number, window_index, feature_values)
                     VALUES (%s, %s, %s, %s)
                     ON CONFLICT DO NOTHING
                 """, (
                     session_id, driver_number, window_index,
-                    feature_matrix
+                    feature_values
                 ))
             
             # Commit frequently

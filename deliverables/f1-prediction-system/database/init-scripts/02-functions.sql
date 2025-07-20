@@ -4,10 +4,12 @@ RETURNS TABLE (
     driver_number INTEGER,
     driver_abbreviation VARCHAR(3),
     window_index INTEGER,
-    feature_matrix FLOAT[][],
+    feature_values FLOAT[],
     y_true INTEGER,
     start_time TIMESTAMPTZ,
-    prediction_time TIMESTAMPTZ
+    prediction_time TIMESTAMPTZ,
+    n_timesteps INTEGER,
+    n_features INTEGER
 ) AS $$
 BEGIN
     RETURN QUERY
@@ -15,10 +17,12 @@ BEGIN
         w.driver_number,
         d.driver_abbreviation,
         w.window_index,
-        f.feature_matrix,
+        f.feature_values,
         w.y_true,
         w.start_time,
-        w.prediction_time
+        w.prediction_time,
+        w.sequence_length as n_timesteps,
+        array_length(w.features_used, 1) as n_features
     FROM time_series_windows w
     JOIN window_features f ON 
         w.session_id = f.session_id AND 
