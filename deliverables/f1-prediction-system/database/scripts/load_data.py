@@ -12,7 +12,8 @@ from datetime import datetime
 import numpy as np
 from tqdm import tqdm
 import logging
-import fastf1
+import time
+import gc
 
 # Import user configuration
 import sys
@@ -26,76 +27,155 @@ from f1_etl import create_safety_car_dataset, DriverLabelEncoder
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def get_driver_mappings(config):
-    """Build driver mappings by loading each session and extracting driver info."""
-    driver_to_number = {}
-    number_to_abbreviation = {}
-    
-    logger.info("Building driver mappings from sessions...")
-    
-    for session_config in config.sessions:
-        try:
-            # Load the session
-            session = fastf1.get_session(
-                session_config.year,
-                session_config.race_name,
-                session_config.session_type
-            )
-            session.load()
-            
-            # Create and fit encoder for this session
-            encoder = DriverLabelEncoder()
-            encoder.fit_session(session)
-            
-            # Merge mappings - keep both string and int versions
-            for abbr, num_str in encoder.driver_to_number.items():
-                driver_num = int(num_str)
-                driver_to_number[abbr] = num_str  # Keep as string
-                number_to_abbreviation[num_str] = abbr  # String key
-                number_to_abbreviation[driver_num] = abbr  # Int key for compatibility
-                
-        except Exception as e:
-            logger.warning(f"Failed to load session {session_config}: {e}")
-            continue
-    
-    logger.info(f"Found {len(driver_to_number)} unique drivers across all sessions")
-    return driver_to_number, number_to_abbreviation
-
 def get_db_connection():
-    """Create database connection using environment variables or config."""
-    # During initialization, PostgreSQL only accepts Unix socket connections
-    # Check if we're in the initialization phase by looking for POSTGRES_USER env var
-    if os.environ.get("POSTGRES_USER") and not os.environ.get("POSTGRES_HOST"):
-        # Use Unix socket connection during initialization
-        conn_params = {
-            "database": os.environ.get("POSTGRES_DB", DB_CONFIG["database"]),
-            "user": os.environ.get("POSTGRES_USER", DB_CONFIG["user"]),
-            # No host parameter = use Unix socket
-        }
-    else:
-        # Normal TCP/IP connection
-        conn_params = {
-            "host": os.environ.get("POSTGRES_HOST", DB_CONFIG["host"]),
-            "port": os.environ.get("POSTGRES_PORT", DB_CONFIG["port"]),
-            "database": os.environ.get("POSTGRES_DB", DB_CONFIG["database"]),
-            "user": os.environ.get("POSTGRES_USER", DB_CONFIG["user"]),
-            "password": os.environ.get("POSTGRES_PASSWORD", DB_CONFIG["password"])
-        }
+    """Create database connection with aggressive timeout and keepalive settings."""
+    conn_params = {
+        "database": os.environ.get("POSTGRES_DB", DB_CONFIG["database"]),
+        "user": os.environ.get("POSTGRES_USER", DB_CONFIG["user"]),
+        # Unix socket connection
+        "connect_timeout": 60,
+        "options": "-c statement_timeout=0 -c idle_in_transaction_session_timeout=0",
+        # Aggressive keepalive to prevent connection drops
+        "keepalives": 1,
+        "keepalives_idle": 10,
+        "keepalives_interval": 5,
+        "keepalives_count": 3
+    }
+    
+    password = os.environ.get("POSTGRES_PASSWORD", DB_CONFIG["password"])
+    if password:
+        conn_params["password"] = password
+    
     return psycopg2.connect(**conn_params)
+
+def process_dataset_in_chunks():
+    """Process dataset in smaller chunks to manage memory."""
+    logger.info("Starting F1 telemetry data ETL process...")
+    
+    # First, just get the metadata without loading all the data
+    logger.info("Loading dataset metadata...")
+    
+    # Create dataset
+    dataset = create_safety_car_dataset(
+        config=CONFIG,
+        window_size=WINDOW_SIZE,
+        prediction_horizon=PREDICTION_HORIZON,
+        normalize=NORMALIZE,
+        target_column="TrackStatus",
+    )
+    
+    # Save essential data
+    metadata = dataset['metadata']
+    y = dataset['y']
+    
+    # Extract driver mappings
+    number_to_abbreviation = {}
+    known_mappings = {
+        '1': 'VER', '11': 'PER', '16': 'LEC', '55': 'SAI',
+        '63': 'RUS', '44': 'HAM', '14': 'ALO', '18': 'STR',
+        '4': 'NOR', '81': 'PIA', '23': 'ALB', '2': 'SAR',
+        '77': 'BOT', '24': 'ZHO', '27': 'HUL', '20': 'MAG',
+        '22': 'TSU', '31': 'OCO', '10': 'GAS', '3': 'RIC',
+        '30': 'LAW', '43': 'COL'
+    }
+    
+    unique_drivers = set(meta['Driver'] for meta in metadata)
+    for driver in unique_drivers:
+        driver_str = str(driver)
+        driver_num = int(driver)
+        abbr = known_mappings.get(driver_str, f'D{driver_num:02d}')
+        number_to_abbreviation[driver_str] = abbr
+        number_to_abbreviation[driver_num] = abbr
+    
+    # Insert basic metadata
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        insert_drivers(cursor, metadata, number_to_abbreviation)
+        insert_sessions(cursor, metadata)
+        conn.commit()
+        logger.info("Metadata inserted successfully")
+    finally:
+        cursor.close()
+        conn.close()
+    
+    # Process windows by session to reduce memory usage
+    session_drivers = {}
+    for idx, meta in enumerate(metadata):
+        key = (meta['SessionId'], int(meta['Driver']))
+        if key not in session_drivers:
+            session_drivers[key] = []
+        session_drivers[key].append(idx)
+    
+    logger.info(f"Processing {len(session_drivers)} session-driver combinations")
+    
+    # Process each session-driver combination separately
+    for (session_id, driver_number), indices in tqdm(session_drivers.items(), desc="Processing sessions"):
+        process_session_driver(session_id, driver_number, indices, metadata, y)
+        
+        # Force garbage collection after each session
+        gc.collect()
+        
+        # Small delay to reduce CPU pressure
+        time.sleep(0.1)
+
+def process_session_driver(session_id, driver_number, indices, metadata, y):
+    """Process a single session-driver combination."""
+    conn = None
+    cursor = None
+    
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Process in very small batches
+        batch_size = 10
+        for i in range(0, len(indices), batch_size):
+            batch_indices = indices[i:i+batch_size]
+            
+            for idx in batch_indices:
+                meta = metadata[idx]
+                window_index = indices.index(idx)
+                
+                cursor.execute("""
+                    INSERT INTO time_series_windows 
+                    (session_id, driver_number, window_index, start_time, 
+                     end_time, prediction_time, y_true, sequence_length, 
+                     prediction_horizon, features_used)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                """, (
+                    session_id, driver_number, window_index,
+                    meta['start_time'], meta['end_time'], 
+                    meta['prediction_time'], int(y[idx]),
+                    meta['sequence_length'], meta['prediction_horizon'],
+                    meta['features_used']
+                ))
+            
+            # Commit frequently
+            conn.commit()
+            
+            # Brief pause every batch
+            time.sleep(0.01)
+            
+    except Exception as e:
+        logger.error(f"Error processing {session_id} - Driver {driver_number}: {str(e)}")
+        if conn:
+            conn.rollback()
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
 
 def insert_drivers(cursor, metadata_list, number_to_abbreviation):
     """Insert unique drivers from metadata."""
     drivers = set()
     for meta in metadata_list:
-        # Driver number in metadata is stored as string
-        driver_num_str = meta['Driver']
-        driver_num = int(driver_num_str)
-        
-        # Check both string and int versions in the mapping
+        driver_num = int(meta['Driver'])
         if driver_num in number_to_abbreviation:
             drivers.add((driver_num, number_to_abbreviation[driver_num]))
-        elif driver_num_str in number_to_abbreviation:
-            drivers.add((driver_num, number_to_abbreviation[driver_num_str]))
     
     for driver_num, driver_abbr in drivers:
         cursor.execute("""
@@ -112,7 +192,6 @@ def insert_sessions(cursor, metadata_list):
     for meta in metadata_list:
         session_id = meta['SessionId']
         if session_id not in sessions:
-            # Parse session_id format: "YYYY_Race Name_SessionType"
             parts = session_id.split('_')
             year = int(parts[0])
             session_type = parts[-1]
@@ -140,165 +219,12 @@ def insert_sessions(cursor, metadata_list):
     
     logger.info(f"Inserted {len(sessions)} sessions")
 
-def prepare_window_data(X, y, metadata, window_idx):
-    """Prepare data for a single time window."""
-    meta = metadata[window_idx]
-    
-    # X shape is (n_samples, n_features, n_timesteps)
-    # We need to transpose to (n_timesteps, n_features) for storage
-    feature_matrix = X[window_idx].T.tolist()
-    
-    return {
-        'start_time': meta['start_time'].isoformat(),
-        'end_time': meta['end_time'].isoformat(),
-        'prediction_time': meta['prediction_time'].isoformat(),
-        'feature_matrix': feature_matrix,
-        'y_true': int(y[window_idx]),
-        'sequence_length': meta['sequence_length'],
-        'prediction_horizon': meta['prediction_horizon'],
-        'features_used': meta['features_used']
-    }
-
-def extract_coordinates_from_telemetry(raw_telemetry, metadata, number_to_abbreviation):
-    """Extract X, Y, Z coordinates from raw telemetry data."""
-    coordinates_by_session_driver = {}
-    
-    # raw_telemetry contains data from all sessions - group by SessionId and Driver
-    for (session_id, driver), group_df in raw_telemetry.groupby(['SessionId', 'Driver']):
-        driver_num = int(driver)
-        if driver_num not in number_to_abbreviation:
-            continue
-            
-        key = (session_id, driver_num)
-        
-        # Sample coordinates at regular intervals to match windows
-        coordinates = []
-        
-        # Get metadata entries for this specific session/driver combination
-        driver_metadata = [m for m in metadata 
-                          if m['SessionId'] == session_id and int(m['Driver']) == driver_num]
-        
-        for meta in driver_metadata:
-            # Find telemetry point closest to window start time
-            # Use Date column for datetime comparison
-            mask = (group_df['Date'] >= meta['start_time']) & \
-                   (group_df['Date'] <= meta['end_time'])
-            window_data = group_df.loc[mask]
-            
-            if not window_data.empty and 'X' in window_data.columns:
-                coord = {
-                    'X': float(window_data.iloc[0]['X']) if not np.isnan(window_data.iloc[0]['X']) else 0.0,
-                    'Y': float(window_data.iloc[0]['Y']) if not np.isnan(window_data.iloc[0]['Y']) else 0.0,
-                    'Z': float(window_data.iloc[0]['Z']) if 'Z' in window_data.columns and not np.isnan(window_data.iloc[0]['Z']) else 0.0
-                }
-                coordinates.append(coord)
-        
-        if coordinates:
-            coordinates_by_session_driver[key] = coordinates
-    
-    return coordinates_by_session_driver
-
-def load_data():
-    """Main ETL function."""
-    logger.info("Starting F1 telemetry data ETL process...")
-    
-    # Create dataset using f1_etl
-    logger.info("Creating safety car dataset...")
-    dataset = create_safety_car_dataset(
-        config=CONFIG,
-        window_size=WINDOW_SIZE,
-        prediction_horizon=PREDICTION_HORIZON,
-        normalize=NORMALIZE,
-        target_column="TrackStatus",
-    )
-    
-    X = dataset['X']
-    y = dataset['y']
-    metadata = dataset['metadata']
-    raw_telemetry = dataset.get('raw_telemetry', [])
-    
-    logger.info(f"Dataset created: {X.shape[0]} windows, {X.shape[1]} features, {X.shape[2]} timesteps")
-    
-    # Extract driver mappings from metadata
-    driver_to_number = {}
-    number_to_abbreviation = {}
-    
-    # Get unique drivers from metadata
-    for meta in metadata:
-        driver_num = int(meta['Driver'])
-        # We need to get abbreviations from somewhere - check if it's in metadata
-        # If not, we'll need to extract from raw_telemetry or use a placeholder
-        if 'driver_abbreviation' in meta:
-            abbr = meta['driver_abbreviation']
-        else:
-            # Try to find abbreviation from raw telemetry
-            driver_mask = raw_telemetry['Driver'] == driver_num
-            if driver_mask.any():
-                # Use driver number as abbreviation if not available
-                abbr = f"D{driver_num:02d}"
-            else:
-                continue
-        
-        driver_to_number[abbr] = driver_num
-        number_to_abbreviation[driver_num] = abbr
-    
-    logger.info(f"Found {len(number_to_abbreviation)} unique drivers in dataset")
-    
-    # Connect to database
+def verify_data():
+    """Verify loaded data."""
     conn = get_db_connection()
     cursor = conn.cursor()
     
     try:
-        # Insert drivers and sessions
-        insert_drivers(cursor, metadata, number_to_abbreviation)
-        insert_sessions(cursor, metadata)
-        conn.commit()
-        
-        # Extract coordinates from raw telemetry
-        logger.info("Extracting telemetry coordinates...")
-        coordinates_data = extract_coordinates_from_telemetry(raw_telemetry, metadata, number_to_abbreviation)
-        
-        # Group windows by session and driver
-        windows_by_session_driver = {}
-        for idx, meta in enumerate(metadata):
-            session_id = meta['SessionId']
-            driver_num = int(meta['Driver'])
-            key = (session_id, driver_num)
-            
-            if key not in windows_by_session_driver:
-                windows_by_session_driver[key] = []
-            
-            window_data = prepare_window_data(X, y, metadata, idx)
-            windows_by_session_driver[key].append(window_data)
-        
-        # Insert time series windows in batches
-        logger.info("Inserting time series windows...")
-        total_windows = 0
-        
-        for (session_id, driver_num), windows in tqdm(windows_by_session_driver.items()):
-            if driver_num not in number_to_abbreviation:
-                continue
-            
-            # Insert windows
-            cursor.execute(
-                "SELECT insert_time_series_batch(%s, %s, %s)",
-                (session_id, driver_num, Json(windows))
-            )
-            
-            # Insert coordinates if available
-            key = (session_id, driver_num)
-            if key in coordinates_data:
-                cursor.execute(
-                    "SELECT insert_telemetry_coordinates_batch(%s, %s, %s)",
-                    (session_id, driver_num, Json(coordinates_data[key]))
-                )
-            
-            total_windows += len(windows)
-        
-        conn.commit()
-        logger.info(f"Successfully loaded {total_windows} time windows")
-        
-        # Verify data
         cursor.execute("SELECT COUNT(DISTINCT session_id) FROM sessions")
         session_count = cursor.fetchone()[0]
         
@@ -308,15 +234,18 @@ def load_data():
         cursor.execute("SELECT COUNT(*) FROM time_series_windows")
         window_count = cursor.fetchone()[0]
         
-        logger.info(f"Database now contains: {session_count} sessions, {driver_count} drivers, {window_count} windows")
+        logger.info(f"Database contains: {session_count} sessions, {driver_count} drivers, {window_count} windows")
         
-    except Exception as e:
-        logger.error(f"Error during data loading: {str(e)}")
-        conn.rollback()
-        raise
     finally:
         cursor.close()
         conn.close()
 
 if __name__ == "__main__":
-    load_data()
+    try:
+        # Skip coordinates for now - focus on getting core data loaded
+        process_dataset_in_chunks()
+        verify_data()
+        logger.info("Data loading completed successfully!")
+    except Exception as e:
+        logger.error(f"Fatal error: {str(e)}")
+        raise

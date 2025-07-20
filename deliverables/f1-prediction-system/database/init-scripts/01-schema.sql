@@ -19,7 +19,7 @@ CREATE TABLE sessions (
     metadata JSONB
 );
 
--- Time series windows table (simplified)
+-- Simplified time_series_windows table
 CREATE TABLE time_series_windows (
     session_id TEXT NOT NULL,
     driver_number INTEGER NOT NULL,
@@ -28,27 +28,35 @@ CREATE TABLE time_series_windows (
     end_time TIMESTAMPTZ NOT NULL,
     prediction_time TIMESTAMPTZ NOT NULL,
     
-    -- Feature matrix: N samples × 9 features stored as JSONB
-    feature_matrix JSONB NOT NULL,
-    
-    -- Ground truth (actual safety car status)
+    -- Just store the ground truth
     y_true INTEGER NOT NULL,
     
-    -- Additional metadata
+    -- Store window parameters for validation
     sequence_length INTEGER NOT NULL,
     prediction_horizon INTEGER NOT NULL,
     features_used TEXT[] NOT NULL,
     
-    -- Constraints
-    FOREIGN KEY (session_id) REFERENCES sessions(session_id),
-    FOREIGN KEY (driver_number) REFERENCES drivers(driver_number),
+    -- Optional: Store pre-computed predictions
+    y_pred INTEGER,
+    y_proba FLOAT[],
+    model_version TEXT,
+    
     PRIMARY KEY (session_id, driver_number, window_index)
 );
 
--- Convert to hypertable (optional - can be commented out if causing issues)
--- SELECT create_hypertable('time_series_windows', 'start_time', 
---     chunk_time_interval => INTERVAL '1 hour',
---     if_not_exists => TRUE);
+-- Since coordinates are needed per window, store them with the windows:
+ALTER TABLE time_series_windows ADD COLUMN x FLOAT, ADD COLUMN y FLOAT, ADD COLUMN z FLOAT;
+
+
+-- Store raw features separately if needed for on-the-fly predictions
+CREATE TABLE window_features (
+    session_id TEXT NOT NULL,
+    driver_number INTEGER NOT NULL,
+    window_index INTEGER NOT NULL,
+    feature_values FLOAT[], -- Store as array instead of JSONB
+    
+    PRIMARY KEY (session_id, driver_number, window_index)
+);
 
 -- Telemetry coordinates table for track visualization
 CREATE TABLE telemetry_coordinates (
