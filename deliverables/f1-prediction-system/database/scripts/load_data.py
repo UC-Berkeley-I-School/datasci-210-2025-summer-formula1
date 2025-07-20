@@ -65,8 +65,11 @@ def process_dataset_in_chunks():
     )
     
     # Save essential data
+    X = dataset['X']  # Now we need X for features
     metadata = dataset['metadata']
     y = dataset['y']
+    
+    logger.info(f"Dataset shape: X={X.shape}, y={y.shape}")
     
     # Extract driver mappings
     number_to_abbreviation = {}
@@ -112,7 +115,7 @@ def process_dataset_in_chunks():
     
     # Process each session-driver combination separately
     for (session_id, driver_number), indices in tqdm(session_drivers.items(), desc="Processing sessions"):
-        process_session_driver(session_id, driver_number, indices, metadata, y)
+        process_session_driver_with_features(session_id, driver_number, indices, metadata, X, y)
         
         # Force garbage collection after each session
         gc.collect()
@@ -120,8 +123,8 @@ def process_dataset_in_chunks():
         # Small delay to reduce CPU pressure
         time.sleep(0.1)
 
-def process_session_driver(session_id, driver_number, indices, metadata, y):
-    """Process a single session-driver combination."""
+def process_session_driver_with_features(session_id, driver_number, indices, metadata, X, y):
+    """Process a single session-driver combination with features."""
     conn = None
     cursor = None
     
@@ -134,10 +137,11 @@ def process_session_driver(session_id, driver_number, indices, metadata, y):
         for i in range(0, len(indices), batch_size):
             batch_indices = indices[i:i+batch_size]
             
-            for idx in batch_indices:
-                meta = metadata[idx]
-                window_index = indices.index(idx)
+            for local_idx, global_idx in enumerate(batch_indices):
+                meta = metadata[global_idx]
+                window_index = i + local_idx  # Correct window index
                 
+                # Insert window metadata
                 cursor.execute("""
                     INSERT INTO time_series_windows 
                     (session_id, driver_number, window_index, start_time, 
@@ -148,9 +152,23 @@ def process_session_driver(session_id, driver_number, indices, metadata, y):
                 """, (
                     session_id, driver_number, window_index,
                     meta['start_time'], meta['end_time'], 
-                    meta['prediction_time'], int(y[idx]),
+                    meta['prediction_time'], int(y[global_idx]),
                     meta['sequence_length'], meta['prediction_horizon'],
                     meta['features_used']
+                ))
+                
+                # Insert features
+                # X[global_idx] shape is (n_timesteps, n_features)
+                feature_matrix = X[global_idx].tolist()  # Convert to nested list
+                
+                cursor.execute("""
+                    INSERT INTO window_features 
+                    (session_id, driver_number, window_index, feature_matrix)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT DO NOTHING
+                """, (
+                    session_id, driver_number, window_index,
+                    feature_matrix
                 ))
             
             # Commit frequently
@@ -234,7 +252,10 @@ def verify_data():
         cursor.execute("SELECT COUNT(*) FROM time_series_windows")
         window_count = cursor.fetchone()[0]
         
-        logger.info(f"Database contains: {session_count} sessions, {driver_count} drivers, {window_count} windows")
+        cursor.execute("SELECT COUNT(*) FROM window_features")
+        feature_count = cursor.fetchone()[0]
+        
+        logger.info(f"Database contains: {session_count} sessions, {driver_count} drivers, {window_count} windows, {feature_count} feature matrices")
         
     finally:
         cursor.close()
