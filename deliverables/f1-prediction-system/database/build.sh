@@ -24,7 +24,6 @@ required_files=(
     "init-scripts/02-functions.sql"
     "init-scripts/99-load-data.sh"
     "scripts/load_data.py"
-    "scripts/requirements.txt"
     "config/data_config.py"
     "config/postgresql.conf"
 )
