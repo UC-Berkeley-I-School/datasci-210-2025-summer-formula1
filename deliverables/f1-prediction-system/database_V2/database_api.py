@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Clean F1 Database Architecture - Unified API
-Combines your existing Timescale setup with our FastAPI approach
 """
 
 from fastapi import FastAPI, HTTPException, Query
