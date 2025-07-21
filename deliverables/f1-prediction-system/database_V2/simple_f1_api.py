@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """
 Fixed Simple F1 Data API
-Access your processed F1 data
 """
 
 from fastapi import FastAPI, HTTPException
