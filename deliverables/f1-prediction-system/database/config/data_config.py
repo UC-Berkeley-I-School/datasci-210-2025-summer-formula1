@@ -11,12 +11,12 @@ from f1_etl import DataConfig, SessionConfig
 SESSIONS = [
     SessionConfig(2024, "Saudi Arabian Grand Prix", "R"),
     SessionConfig(2024, "Qatar Grand Prix", "R"),
-    SessionConfig(2024, "Chinese Grand Prix", "R"),
-    SessionConfig(2024, "Mexico City Grand Prix", "R"),
-    SessionConfig(2024, "São Paulo Grand Prix", "R"),
-    SessionConfig(2024, "Miami Grand Prix", "R"),
-    SessionConfig(2024, "United States Grand Prix", "R"),
-    SessionConfig(2024, "Monaco Grand Prix", "R"),
+    # SessionConfig(2024, "Chinese Grand Prix", "R"),
+    # SessionConfig(2024, "Mexico City Grand Prix", "R"),
+    # SessionConfig(2024, "São Paulo Grand Prix", "R"),
+    # SessionConfig(2024, "Miami Grand Prix", "R"),
+    # SessionConfig(2024, "United States Grand Prix", "R"),
+    # SessionConfig(2024, "Monaco Grand Prix", "R"),
 ]
 
 # Optionally filter by specific drivers (None = all drivers)
