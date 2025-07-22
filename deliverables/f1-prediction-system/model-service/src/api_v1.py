@@ -97,6 +97,12 @@ def predict(request: PredictRequest):
     predictions = []
     import json
     for driver_number, (X, y_true, metadata) in features_by_driver.items():
+        # Defensive: parse y_true if it's a string
+        if isinstance(y_true, str):
+            try:
+                y_true = json.loads(y_true)
+            except Exception:
+                y_true = []
         # Defensive: parse metadata if it's a string
         if not isinstance(metadata, dict):
             try:
