@@ -96,20 +96,20 @@ def predict(request: PredictRequest):
     features_by_driver = features.get('features_by_driver', {})
     predictions = []
     import json
-for driver_number, (X, y_true, metadata) in features_by_driver.items():
-    # Defensive: parse metadata if it's a string
-    if not isinstance(metadata, dict):
-        try:
-            metadata = json.loads(metadata)
-        except Exception:
-            metadata = {}
-    predictions.append(DriverPrediction(
-        driver_number=metadata.get('driver_number', driver_number),
-        driver_abbreviation=metadata.get('driver_abbreviation', ''),
-        y_true=y_true,
-        y_pred=[],  # To be filled with model output
-        y_proba=[]  # To be filled with model output
-    ))
+    for driver_number, (X, y_true, metadata) in features_by_driver.items():
+        # Defensive: parse metadata if it's a string
+        if not isinstance(metadata, dict):
+            try:
+                metadata = json.loads(metadata)
+            except Exception:
+                metadata = {}
+        predictions.append(DriverPrediction(
+            driver_number=metadata.get('driver_number', driver_number),
+            driver_abbreviation=metadata.get('driver_abbreviation', ''),
+            y_true=y_true,
+            y_pred=[],  # To be filled with model output
+            y_proba=[]  # To be filled with model output
+        ))
     if not predictions:
         raise HTTPException(status_code=404, detail="No driver data found for session")
     return PredictResponse(session_id=request.session_id, predictions=predictions)
