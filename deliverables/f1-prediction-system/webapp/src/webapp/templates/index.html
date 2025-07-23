@@ -1,0 +1,139 @@
+<html>
+<head>
+    <script src="https://cdn.plot.ly/plotly-3.0.1.min.js" charset="utf-8"></script>
+
+
+<style>
+.race-selector {
+    text-align: center;
+    padding: 10px;
+    background: #2d2d2d;
+    margin: 10px 0px;
+    max-width: 500px;
+}
+
+.waiting-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 700px;
+    background: #1e1e1e;
+    color: #999;
+}
+
+.hidden { display: none; }
+
+select, button {
+    background: #444;
+    color: white;
+    border: 1px solid #666;
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin: 10px;
+    font-size: 16px;
+}
+
+button:hover { background: #ff6b6b; cursor: pointer; }
+</style>
+
+<title>F1 Dev</title>
+</head>
+<body style="background: rgb(122, 122, 122); color: white; font-family: Arial;">
+       
+        <div style="margin-left:30px;"><img src="{{ url_for('static', filename='images/overtakeai.png') }}" alt="Logo" style="height: 100px;"></div>
+
+        <div class="race-selector">
+            <h2>Select F1 Race</h2>
+            <select id="raceSelect">
+                <option value="">Choose a race...</option>
+                <option value="2023_sao_paulo">2023 São Paulo GP</option>
+            </select>
+            <button onclick="loadRace()">Load Race</button>
+        </div>
+
+        <!-- Waiting state (shows initially) -->
+        <div id="waitingState" class="waiting-state">
+            <h3>...Waiting for race data</h3>
+            <p>Select a race from the menu</p>
+        </div>
+
+
+
+        <div id="plotContainer" class="waiting-state hidden">
+            <!-- Your existing Plotly.newPlot code goes here -->
+            <div id="plot" style="height: 600px; margin: 20px;"></div>
+        </div>
+<!-- 
+        <script>
+            window.onload = function() {
+                console.log('Loading animation...');
+                var plotData = {{ graphJSON | safe }};
+                
+                console.log('Data loaded:', plotData);
+                console.log('Frames:', plotData.frames ? plotData.frames.length : 0);
+                
+                Plotly.newPlot('plot', plotData.data, plotData.layout)
+                    .then(function() {
+                        console.log('Base plot created');
+                        
+                        if (plotData.frames && plotData.frames.length > 0) {
+                            console.log('Adding frames...');
+                            return Plotly.addFrames('plot', plotData.frames);
+                        }
+                    })
+                    .then(function() {
+                        console.log('Animation ready! Try the Play button.');
+                    })
+                    .catch(function(err) {
+                        console.error('Error:', err);
+                        document.body.innerHTML += '<p style="color: red;">Error: ' + err + '</p>';
+                    });
+            };
+        </script> -->
+
+        <script>
+        function loadRace() {
+            const selectedRace = document.getElementById('raceSelect').value;
+            
+            if (!selectedRace) {
+                alert('Please select a race first!');
+                return;
+            }
+            
+            // Hide waiting state, show plot
+            document.getElementById('waitingState').classList.add('hidden');
+            document.getElementById('plotContainer').classList.remove('hidden');
+            
+            // Add loading indicator
+            //document.getElementById('plot').innerHTML = '<div style="text-align:center; padding:50px;">🔄 Loading race data...</div>';
+            
+            // Your existing Plotly code here
+            console.log('Loading animation...');
+            var plotData = {{ graphJSON | safe }};
+            
+            console.log('Data loaded:', plotData);
+            console.log('Frames:', plotData.frames ? plotData.frames.length : 0);
+            
+            Plotly.newPlot('plot', plotData.data, plotData.layout)
+                .then(function() {
+                    console.log('Base plot created');
+                    
+                    if (plotData.frames && plotData.frames.length > 0) {
+                        console.log('Adding frames...');
+                        return Plotly.addFrames('plot', plotData.frames);
+                    }
+                })
+                .then(function() {
+                    console.log('Animation ready! Try the Play button.');
+                })
+                .catch(function(err) {
+                    console.error('Error:', err);
+                    document.body.innerHTML += '<p style="color: red;">Error: ' + err + '</p>';
+                });
+        }
+        </script>
+
+</body>
+
+</html>
