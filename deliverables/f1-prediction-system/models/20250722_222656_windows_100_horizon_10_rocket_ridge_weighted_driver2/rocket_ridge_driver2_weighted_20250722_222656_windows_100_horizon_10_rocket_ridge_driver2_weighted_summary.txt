@@ -1,0 +1,74 @@
+================================================================================
+MODEL EVALUATION REPORT
+================================================================================
+
+EVALUATION OVERVIEW
+----------------------------------------
+Evaluation ID: rocket_ridge_driver2_weighted_20250722_222656_windows_100_horizon_10_rocket_ridge_driver2_weighted
+Timestamp: 2025-07-22T22:27:09.641463
+Target Class: safety_car
+Test Size: 28.5%
+
+DATASET CONFIGURATION
+----------------------------------------
+Scope: multi_session_2024_R_7sessions
+Drivers: 2
+Window Size: 100
+Prediction Horizon: 10
+Features Used: multivariate_all_9_features
+Multivariate: True
+Total Samples: 4,675
+Shape: (4675, 100, 9)
+Class Distribution:
+  green: 3,992
+  red: 289
+  safety_car: 259
+  vsc: 45
+  vsc_ending: 1
+  yellow: 89
+
+MODEL CONFIGURATION
+----------------------------------------
+Model Type: rocket_ridge_driver2_weighted
+Base Estimator: NoneType
+Wrapper: Catch22Classifier
+Custom Weights: False
+Hyperparameters:
+  class_weight: {0: 1.0, 1: 1.0, 2: 5.0, 3: 1.0, 4: 1.0, 5: 1.0, 6: 1.0}
+  estimator: None
+  n_jobs: 1
+  n_kernels: 1000
+  random_state: None
+
+PERFORMANCE RESULTS
+----------------------------------------
+Overall Accuracy: 0.7145
+F1-Macro: 0.2192
+F1-Weighted: 0.6429
+
+TARGET CLASS ANALYSIS: SAFETY_CAR
+----------------------------------------
+Precision: 0.0244
+Recall: 0.1250
+F1-Score: 0.0408
+True Positives: 2
+False Negatives: 14 (missed events)
+False Positives: 80 (false alarms)
+True Negatives: 1,207
+
+PER-CLASS PERFORMANCE
+----------------------------------------
+Class        Precision  Recall     F1         Support   
+------------------------------------------------------------
+green        0.761      0.928      0.836      1001      
+red          0.000      0.000      0.000      272       
+safety_car   0.024      0.125      0.041      16        
+yellow       0.000      0.000      0.000      14        
+
+CONFUSION MATRIX
+----------------------------------------
+                 Pred_green  Pred_red  Pred_safety_car  Pred_yellow
+True_green              929         0               72            0
+True_red                265         0                7            0
+True_safety_car          14         0                2            0
+True_yellow              13         0                1            0
