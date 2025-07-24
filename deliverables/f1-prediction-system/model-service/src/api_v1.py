@@ -52,9 +52,9 @@ from database.client_tools.db_client import F1TimescaleDAO, SessionInfo, DriverC
 DB_CONFIG = {
     'host': os.environ.get('DB_HOST', 'localhost'),
     'port': int(os.environ.get('DB_PORT', 5432)),
-    'database': os.environ.get('DB_NAME', 'f1'),
-    'user': os.environ.get('DB_USER', 'f1user'),
-    'password': os.environ.get('DB_PASSWORD', 'f1pass')
+    'database': os.environ.get('DB_NAME', 'racing_telemetry'),
+    'user': os.environ.get('DB_USER', 'racing_user'),
+    'password': os.environ.get('DB_PASSWORD', 'racing_password')
 }
 
 dao = F1TimescaleDAO(DB_CONFIG)
