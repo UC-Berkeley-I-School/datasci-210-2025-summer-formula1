@@ -65,7 +65,7 @@ services:
 
   model-service:
     build:
-      context: ../..
+      context: ..
       dockerfile: model-service/Dockerfile
     container_name: racing_model_service
     environment:
