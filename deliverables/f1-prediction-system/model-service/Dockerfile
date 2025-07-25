@@ -17,4 +17,4 @@ WORKDIR /app/model-service
 
 EXPOSE 8088
 
-CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8088", "--reload"]
+CMD ["env", "PYTHONPATH=/app", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8088", "--reload"]
