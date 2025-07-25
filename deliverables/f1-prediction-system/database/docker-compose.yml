@@ -65,7 +65,8 @@ services:
 
   model-service:
     build:
-      context: ../model-service
+      context: ../..
+      dockerfile: model-service/Dockerfile
     container_name: racing_model_service
     environment:
       - DB_HOST=timescaledb
