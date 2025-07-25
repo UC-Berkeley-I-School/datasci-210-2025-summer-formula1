@@ -47,7 +47,7 @@ class TelemetryResponse(BaseModel):
 
 import os
 from database.client_tools.db_client import F1TimescaleDAO, SessionInfo, DriverCoordinates
-from model_service.model_manager import model_manager
+from src.model_manager import model_manager
 
 # Load DB config from environment variables
 DB_CONFIG = {
