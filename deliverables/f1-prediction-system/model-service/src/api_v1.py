@@ -47,6 +47,7 @@ class TelemetryResponse(BaseModel):
 
 import os
 from database.client_tools.db_client import F1TimescaleDAO, SessionInfo, DriverCoordinates
+from model_service.model_manager import model_manager
 
 # Load DB config from environment variables
 DB_CONFIG = {
@@ -96,7 +97,12 @@ def predict(request: PredictRequest):
     features_by_driver = features.get('features_by_driver', {})
     predictions = []
     import json
-    for driver_number, (X, y_true, metadata) in features_by_driver.items():
+    for driver_number, driver_data in features_by_driver.items():
+        # Unpack driver_data (dict-based from db_client)
+        X = driver_data.get('X')
+        y_true = driver_data.get('y_true')
+        metadata = driver_data.get('metadata')
+
         # Defensive: parse y_true if it's a string
         if isinstance(y_true, str):
             try:
@@ -109,12 +115,38 @@ def predict(request: PredictRequest):
                 metadata = json.loads(metadata)
             except Exception:
                 metadata = {}
+
+        # Find the model subdirectory for this driver
+        model_dir = None
+        models_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../models'))
+        for d in os.listdir(models_root):
+            if d.endswith(f'driver{driver_number}'):
+                model_dir = os.path.join(models_root, d)
+                break
+        y_pred = []
+        y_proba = []
+        if model_dir:
+            try:
+                # Use subdirectory name as model_id for ModelManager
+                model_id = os.path.basename(model_dir) + '/my_model'
+                model = model_manager.get_model(model_id)
+                # Run prediction
+                y_pred = model.predict(X).tolist()
+                # Run predict_proba if available
+                if hasattr(model, 'predict_proba'):
+                    y_proba = model.predict_proba(X).tolist()
+                else:
+                    y_proba = []
+            except Exception as e:
+                # Log error or continue with empty predictions
+                y_pred = []
+                y_proba = []
         predictions.append(DriverPrediction(
             driver_number=metadata.get('driver_number', driver_number),
             driver_abbreviation=metadata.get('driver_abbreviation', ''),
             y_true=y_true,
-            y_pred=[],  # To be filled with model output
-            y_proba=[]  # To be filled with model output
+            y_pred=y_pred,
+            y_proba=y_proba
         ))
     if not predictions:
         raise HTTPException(status_code=404, detail="No driver data found for session")
