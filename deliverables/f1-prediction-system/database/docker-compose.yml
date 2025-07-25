@@ -63,7 +63,7 @@ services:
     ports:
       - "6379:6379"
 
-  model-service:
+  model_service:
     build:
       context: ..
       dockerfile: model_service/Dockerfile

@@ -10,10 +10,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY model_service /app/model_service
 COPY database /app/database
 
-# Set PYTHONPATH so both model-service and database are importable
+# Set PYTHONPATH so both model_service and database are importable
 ENV PYTHONPATH=/app
 
-WORKDIR /app/model-service
+WORKDIR /app/model_service
 
 EXPOSE 8088
 
