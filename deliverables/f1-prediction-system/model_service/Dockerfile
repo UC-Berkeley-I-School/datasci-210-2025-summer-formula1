@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy both model_service and database source code into the image
 COPY model_service /app/model_service
 COPY database /app/database
+COPY models /app/models
 
 # Set PYTHONPATH so both model_service and database are importable
 ENV PYTHONPATH=/app
