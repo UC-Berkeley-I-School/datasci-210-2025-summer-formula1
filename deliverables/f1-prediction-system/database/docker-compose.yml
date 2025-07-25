@@ -58,6 +58,26 @@ services:
   redis:
     image: redis:7-alpine
     container_name: racing_redis
+    networks:
+      - racing_network
+
+  model-service:
+    build:
+      context: ../model-service
+    container_name: racing_model_service
+    environment:
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - DB_NAME=racing_telemetry
+      - DB_USER=racing_user
+      - DB_PASSWORD=racing_password
+    ports:
+      - "8088:8088"
+    depends_on:
+      - timescaledb
+    networks:
+      - racing_network
+
     ports:
       - "6379:6379"
     volumes:
