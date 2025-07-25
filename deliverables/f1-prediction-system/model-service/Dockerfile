@@ -3,14 +3,17 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Copy requirements and install dependencies
-COPY requirements.txt ./
+COPY model-service/requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the rest of the code
-COPY . .
+# Copy both model-service and database source code into the image
+COPY model-service /app/model-service
+COPY database /app/database
 
-# Set PYTHONPATH so model-service can import database package
-ENV PYTHONPATH=/app/../
+# Set PYTHONPATH so both model-service and database are importable
+ENV PYTHONPATH=/app
+
+WORKDIR /app/model-service
 
 EXPOSE 8088
 
