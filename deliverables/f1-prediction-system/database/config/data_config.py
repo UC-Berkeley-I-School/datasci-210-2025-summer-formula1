@@ -39,7 +39,7 @@ NORMALIZE = True  # Whether to normalize features
 DB_CONFIG = {
     "host": "localhost",
     "port": 5432,
-    "database": "f1_telemetry",
+    "database": "racing_telemetry",
     "user": "f1_user",
     "password": "f1_password"
 }
