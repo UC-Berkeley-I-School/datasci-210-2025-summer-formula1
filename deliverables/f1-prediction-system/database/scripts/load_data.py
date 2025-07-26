@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 def get_db_connection():
     """Create database connection with aggressive timeout and keepalive settings."""
+    print("DEBUG DB_CONFIG:", DB_CONFIG)
     conn_params = {
         "database": os.environ.get("POSTGRES_DB", DB_CONFIG["database"]),
         "user": os.environ.get("POSTGRES_USER", DB_CONFIG["user"]),
