@@ -31,12 +31,13 @@ def get_db_connection():
     """Create database connection with aggressive timeout and keepalive settings."""
     print("DEBUG DB_CONFIG:", DB_CONFIG)
     conn_params = {
+        "host": os.environ.get("POSTGRES_HOST", DB_CONFIG["host"]),
+        "port": int(os.environ.get("POSTGRES_PORT", DB_CONFIG["port"])),
         "database": os.environ.get("POSTGRES_DB", DB_CONFIG["database"]),
         "user": os.environ.get("POSTGRES_USER", DB_CONFIG["user"]),
-        # Unix socket connection
+        "password": os.environ.get("POSTGRES_PASSWORD", DB_CONFIG["password"]),
         "connect_timeout": 60,
         "options": "-c statement_timeout=0 -c idle_in_transaction_session_timeout=0",
-        # Aggressive keepalive to prevent connection drops
         "keepalives": 1,
         "keepalives_idle": 10,
         "keepalives_interval": 5,
