@@ -8,7 +8,7 @@ class ModelManager:
     Manages loading and caching of up to N models in memory.
     Uses an LRU (Least Recently Used) eviction policy.
     """
-    def __init__(self, max_models: int = 20, model_dir: str = "models"):
+    def __init__(self, max_models: int = 20, model_dir: str = "/Users/thomasclaiborne/Documents/DataSci-210/datasci-210-2025-summer-formula1/deliverables/f1-prediction-system/models"):
         self.max_models = max_models
         self.model_dir = model_dir
         self._models: OrderedDict[str, Any] = OrderedDict()
@@ -18,13 +18,11 @@ class ModelManager:
         """Retrieve a model by model_id, loading it if not already in memory."""
         with self._lock:
             if model_id in self._models:
-                # Move to end to mark as recently used
                 self._models.move_to_end(model_id)
                 return self._models[model_id]
-            # Otherwise, load model
-            model_path = f"{self.model_dir}/{model_id}.pkl"
+            # Otherwise, load model from new structure
+            model_path = f"{self.model_dir}/{model_id}/my_model.pkl"
             model = load(model_path)
-            # Evict least recently used if over capacity
             if len(self._models) >= self.max_models:
                 self._models.popitem(last=False)
             self._models[model_id] = model
