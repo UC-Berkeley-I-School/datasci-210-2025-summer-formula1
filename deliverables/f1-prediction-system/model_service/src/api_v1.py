@@ -132,7 +132,7 @@ def predict(request: PredictRequest):
         if model_dir:
             try:
                 # Use subdirectory name as model_id for ModelManager
-                model_id = os.path.basename(model_dir) + '/my_model'
+                model_id = os.path.basename(model_dir)
                 model = model_manager.get_model(model_id)
                 # Run prediction
                 y_pred = model.predict(X).tolist()
