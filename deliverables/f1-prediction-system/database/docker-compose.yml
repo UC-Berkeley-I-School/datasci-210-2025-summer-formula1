@@ -77,6 +77,8 @@ services:
       - DB_PASSWORD=racing_password
     ports:
       - "8088:8088"
+    volumes:
+      - /datasci-210-2025-summer-formula1/deliverables/f1-prediction-system/models:/datasci-210-2025-summer-formula1/deliverables/f1-prediction-system/models
     depends_on:
       - timescaledb
     networks:

@@ -140,7 +140,7 @@ def predict(request: PredictRequest):
                 else:
                     y_proba = []
             except Exception as e:
-                # Log error or continue with empty predictions
+                logging.error(f"Model loading/prediction error for driver {driver_number}: {e}")
                 y_pred = []
                 y_proba = []
         predictions.append(DriverPrediction(
