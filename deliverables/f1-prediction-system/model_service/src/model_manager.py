@@ -8,7 +8,7 @@ class ModelManager:
     Manages loading and caching of up to N models in memory.
     Uses an LRU (Least Recently Used) eviction policy.
     """
-    def __init__(self, max_models: int = 20, model_dir: str = "/DataSci-210/datasci-210-2025-summer-formula1/deliverables/f1-prediction-system/models"):
+    def __init__(self, max_models: int = 20, model_dir: str = "/datasci-210-2025-summer-formula1/deliverables/f1-prediction-system/models"):
         self.max_models = max_models
         self.model_dir = model_dir
         self._models: OrderedDict[str, Any] = OrderedDict()
