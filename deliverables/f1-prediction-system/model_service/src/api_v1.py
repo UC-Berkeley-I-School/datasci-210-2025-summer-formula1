@@ -1,3 +1,5 @@
+import os
+import logging
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any
@@ -121,7 +123,7 @@ def predict(request: PredictRequest):
         model_dir = None
         model_id = None
         for d in os.listdir(models_root):
-            if d.endswith(f'driver{driver_number}'):
+            if d.endswith(f'_driver{driver_number}'):
                 model_dir = os.path.join(models_root, d)
                 model_id = d  # Use the full directory name as model_id
                 break
