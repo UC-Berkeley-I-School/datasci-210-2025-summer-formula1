@@ -1,0 +1,1297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OvertakeAI - F1 Safety Car Early Warning System ({{ race_year }} {{ race_name }})</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #1e1e1e;
+            color: white;
+            font-family: 'Arial', sans-serif;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            background: #2d2d2d;
+            padding: 20px;
+            border-radius: 10px;
+            border: 2px solid #444;
+        }
+
+        .race-info {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            margin: 10px 0;
+        }
+
+        .race-info div {
+            text-align: center;
+        }
+
+        .race-info .primary {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00ff00;
+        }
+
+        .race-info .secondary {
+            font-size: 14px;
+            color: #aaa;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 2fr 2fr 1fr;
+            grid-gap: 20px;
+            height: 80vh;
+        }
+
+        .chart-container {
+            background: #2d2d2d;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #444;
+        }
+
+        .chart-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            text-align: center;
+            color: #fff;
+        }
+
+        .controls {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 20px 0;
+        }
+
+        .control-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+
+        .control-btn:hover {
+            background: #45a049;
+        }
+
+        .control-btn.pause {
+            background: #f44336;
+        }
+
+        .control-btn.restart {
+            background: #2196F3;
+        }
+
+        .progress-container {
+            margin: 20px 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #444;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #8BC34A);
+            transition: width 0.3s ease;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill.warning {
+            background: linear-gradient(90deg, #FF9800, #FF5722);
+            box-shadow: 0 0 10px rgba(255, 152, 0, 0.5);
+        }
+
+        .progress-fill.critical {
+            background: linear-gradient(90deg, #f44336, #D32F2F);
+            box-shadow: 0 0 15px rgba(244, 67, 54, 0.7);
+            animation: criticalFlash 0.5s infinite;
+        }
+
+        .lap-info {
+            text-align: center;
+            margin: 10px 0;
+            font-size: 16px;
+        }
+
+        .bar-chart {
+            height: 100%;
+        }
+
+        .bar {
+            transition: width 0.3s ease;
+        }
+
+        .bar-label {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        .bar-value {
+            font-size: 11px;
+            fill: white;
+        }
+
+        .track-map {
+            height: 100%;
+        }
+
+        .track-outline {
+            fill: none;
+            stroke: #00ff00;
+            stroke-width: 4;
+            stroke-dasharray: 8,4;
+            opacity: 0.9;
+        }
+
+        .car {
+            transition: all 0.3s ease;
+        }
+
+        .car-dot {
+            r: 6;
+            stroke: white;
+            stroke-width: 2;
+        }
+
+        .car-label {
+            font-size: 10px;
+            font-weight: bold;
+            text-anchor: middle;
+            dominant-baseline: central;
+            fill: white;
+            pointer-events: none;
+        }
+
+        .status-panel {
+            height: 100%;
+            overflow-y: auto;
+        }
+
+        .status-item {
+            margin-bottom: 15px;
+            padding: 10px;
+            background: #333;
+            border-radius: 5px;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .status-item.yellow {
+            border-left-color: #FFC107;
+        }
+
+        .status-item.red {
+            border-left-color: #f44336;
+        }
+
+        .status-item.warning {
+            border-left-color: #FF5722;
+            background: rgba(255, 87, 34, 0.1);
+            animation: warningPulse 1s infinite;
+        }
+
+        .status-item.critical {
+            border-left-color: #f44336;
+            background: rgba(244, 67, 54, 0.2);
+            animation: criticalFlash 0.5s infinite;
+        }
+
+        @keyframes warningPulse {
+            0%, 100% { 
+                background: rgba(255, 87, 34, 0.1);
+                box-shadow: 0 0 5px rgba(255, 87, 34, 0.3);
+            }
+            50% { 
+                background: rgba(255, 87, 34, 0.2);
+                box-shadow: 0 0 15px rgba(255, 87, 34, 0.6);
+            }
+        }
+
+        @keyframes criticalFlash {
+            0%, 100% { 
+                background: rgba(244, 67, 54, 0.2);
+                box-shadow: 0 0 10px rgba(244, 67, 54, 0.5);
+            }
+            50% { 
+                background: rgba(244, 67, 54, 0.4);
+                box-shadow: 0 0 20px rgba(244, 67, 54, 0.8);
+            }
+        }
+
+        .speed-slider {
+            width: 200px;
+            margin: 0 10px;
+        }
+
+        .timeline-slider {
+            width: 300px;
+            margin: 0 10px;
+        }
+
+        .slider-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin: 10px 0;
+        }
+
+        .slider-label {
+            color: white;
+            font-size: 14px;
+            min-width: 80px;
+        }
+
+        .data-quality {
+            font-size: 12px;
+            color: #aaa;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .race-selector {
+            background: #2d2d2d;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            border: 2px solid #444;
+            text-align: center;
+        }
+
+        .race-selector h3 {
+            margin: 0 0 15px 0;
+            color: #00ff00;
+            font-size: 18px;
+        }
+
+        .race-selector select {
+            background: #444;
+            color: white;
+            border: 2px solid #666;
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 0 10px;
+            font-size: 16px;
+            min-width: 250px;
+        }
+
+        .race-selector button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 0 10px;
+            transition: background 0.3s;
+        }
+
+        .race-selector button:hover {
+            background: #45a049;
+        }
+
+        .race-selector button:disabled {
+            background: #666;
+            cursor: not-allowed;
+        }
+
+        .loading {
+            color: #ffa500;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div style="margin-left:30px;"><img src="{{ url_for('static', filename='images/overtakeai.png') }}" alt="Logo" style="height: 100px;"></div>
+    
+    <div class="header">
+        {% if race_name and race_year %}
+        <div class="race-info">
+            <div>
+                <div class="primary">🏁 {{ race_year }} {{ race_name }}</div>
+                <div class="secondary">Live Telemetry Analysis</div>
+            </div>
+            <div>
+                <div class="primary">{{ estimated_laps }} Laps</div>
+                <div class="secondary">Expected Race Distance</div>
+            </div>
+            <div>
+                <div class="primary">{{ "{:,}".format(data_quality) }}</div>
+                <div class="secondary">Data Windows</div>
+            </div>
+        </div>
+        {% else %}
+        <div class="race-info">
+            <div>
+                <div class="primary">F1 Safety Car Early Warning System</div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+    
+    <div class="race-selector">
+        <h3>Select F1 Race</h3>
+        <select id="raceSelect">
+            <option value="">Loading races...</option>
+        </select>
+        <button id="loadRaceBtn" onclick="loadSelectedRace()" disabled>Load Race</button>
+        <span id="loadingStatus" class="loading" style="display: none;">Loading telemetry data...</span>
+        <div id="raceDetails" style="margin-top: 10px; font-size: 14px; color: #aaa; display: none;">
+            <div id="raceInfo"></div>
+        </div>
+    </div>
+    
+    {% if show_selector == False %}
+    <div class="controls">
+        <button class="control-btn" id="playBtn">▶️ Play Race</button>
+        <button class="control-btn pause" id="pauseBtn">⏸️ Pause</button>
+        <button class="control-btn restart" id="restartBtn">⏮️ Restart</button>
+        <span style="margin: 0 20px; line-height: 40px;">Speed:</span>
+        <input type="range" id="speedSlider" class="speed-slider" min="50" max="1000" value="300">
+        <span id="speedLabel" style="line-height: 40px;">300ms</span>
+        <span style="margin: 0 20px; line-height: 40px;">Timeline:</span>
+        <input type="range" id="timelineSlider" class="timeline-slider" min="0" max="100" value="0">
+        <span id="timelineLabel" style="line-height: 40px;">Timestep 0</span>
+    </div>
+
+    <div class="progress-container">
+        <div class="progress-bar">
+            <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="lap-info">
+            <span id="lapInfo">Lap 1 / {{ estimated_laps }}</span> | 
+            <span id="timestepInfo">Timestep 0 / 0</span>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="chart-container">
+            <div class="chart-title">Safety Car Probability by Driver</div>
+            <div id="barChart" class="bar-chart"></div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">Live Track Position - {{ race_name }}</div>
+            <div id="trackMap" class="track-map"></div>
+        </div>
+        
+        <div class="chart-container">
+            <div class="chart-title">🏁 Race Control</div>
+            <div id="statusPanel" class="status-panel">
+                <div class="status-item">
+                    <strong>📊 Safety Car Monitor</strong><br>
+                    Current probability: 0.000%<br>
+                    Conditions normal - monitoring ongoing
+                </div>
+                <div class="status-item">
+                    <strong>🟢 Track Status: Green</strong><br>
+                    All clear - normal racing conditions
+                </div>
+                <div class="status-item">
+                    <strong>🏁 Race Info</strong><br>
+                    Lap: 1 / {{ estimated_laps }}<br>
+                    Timestep: 0 / 0
+                </div>
+                <div class="status-item">
+                    <strong>🌡️ Weather</strong><br>
+                    Track: 32°C | Air: 28°C<br>
+                    Humidity: 65% | Wind: 8 km/h
+                </div>
+                <div class="status-item">
+                    <strong>⏱️ Session Time</strong><br>
+                    <span id="sessionTime">00:00</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if data_quality > 0 %}
+    <div class="data-quality">
+        Data Quality: {{ "{:,}".format(data_quality) }} telemetry windows • Perfect fidelity • No sampling applied
+    </div>
+    {% endif %}
+
+    <script>
+        // Get telemetry data from Flask backend
+        const rawTelemetryData = {{ telemetry_data|safe }};
+        const telemetryData = rawTelemetryData && rawTelemetryData !== null ? rawTelemetryData : null;
+        
+        // Check if we have valid telemetry data
+        const hasValidData = telemetryData && typeof telemetryData === 'object' && telemetryData.drivers;
+        
+        // Extract data components (use fallbacks for empty state)
+        const drivers = hasValidData ? telemetryData.drivers : [];
+        const probabilities = hasValidData ? telemetryData.probabilities : [];
+        const trackData = hasValidData ? telemetryData.track_data : {};
+        const totalTimesteps = hasValidData ? telemetryData.totalTimesteps : 0;
+        const totalLaps = hasValidData ? telemetryData.totalLaps : {{ estimated_laps }};
+        const sessionMetadata = hasValidData ? telemetryData.session_metadata : {};
+        
+        // Show empty state if no valid data
+        if (!hasValidData) {
+            console.log('No telemetry data available - showing race selector only');
+            showEmptyState();
+        }
+
+        function showEmptyState() {
+            // Hide visualization elements
+            const container = document.querySelector('.container');
+            const controls = document.querySelector('.controls');
+            const progressContainer = document.querySelector('.progress-container');
+            
+            if (container) container.style.display = 'none';
+            if (controls) controls.style.display = 'none';
+            if (progressContainer) progressContainer.style.display = 'none';
+            
+            // Update header to show empty state
+            const header = document.querySelector('.header');
+            if (header) {
+                header.innerHTML = `
+                    <h1>F1 Safety Car Early Warning System</h1>
+                    <div class="race-info">
+                        <div>
+                            <div class="primary">No Race Selected</div>
+                            <div class="secondary">Choose a race from the dropdown below</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show empty state message in main area
+            const emptyStateMessage = document.createElement('div');
+            emptyStateMessage.id = 'emptyStateMessage';
+            emptyStateMessage.style.cssText = `
+                text-align: center;
+                padding: 60px 20px;
+                color: #a0a0a0;
+                background: rgba(255, 255, 255, 0.02);
+                border-radius: 15px;
+                margin: 20px 0;
+            `;
+            emptyStateMessage.innerHTML = `
+                <div style="font-size: 4em; margin-bottom: 20px; opacity: 0.5;"></div>
+                <h3 style="margin-bottom: 10px; color: #666;">Select a Race to Begin</h3>
+                <p style="margin-bottom: 30px; line-height: 1.6;">
+                    Choose a race from the dropdown above to view live telemetry data.<br>
+                    Experience real-time F1 car positions, safety car predictions, and race analytics.
+                </p>
+            `;
+            
+            // Insert empty state after race selector
+            const raceSelector = document.querySelector('.race-selector');
+            if (raceSelector && raceSelector.parentNode) {
+                raceSelector.parentNode.insertBefore(emptyStateMessage, raceSelector.nextSibling);
+            }
+            
+            // Still initialize race selector functionality
+            fetchAvailableSessions();
+            return; // Don't initialize visualizations
+        }
+        
+        // F1 team colors (approximate)
+        const driverColors = {
+            'VER': '#1E41FF', 'PER': '#1E41FF', // Red Bull
+            'HAM': '#00D2BE', 'RUS': '#00D2BE', // Mercedes
+            'LEC': '#DC143C', 'SAI': '#DC143C', // Ferrari
+            'NOR': '#FF8700', 'PIA': '#FF8700', // McLaren
+            'ALO': '#006F62', 'STR': '#006F62', // Aston Martin
+            'GAS': '#0090FF', 'OCO': '#0090FF', // Alpine
+            'ALB': '#005AFF', 'SAR': '#005AFF', // Williams
+            'TSU': '#FFFFFF', 'RIC': '#FFFFFF', // AlphaTauri
+            'BOT': '#900000', 'ZHO': '#900000', // Alfa Romeo
+            'HUL': '#FFFFFF', 'MAG': '#FFFFFF', // Haas
+            'DEV': '#005AFF' // Default
+        };
+
+        // Race selection functionality
+        let availableSessions = [];
+        
+        // Fetch available sessions on page load
+        async function fetchAvailableSessions() {
+            console.log('🌐 Fetching available sessions...');
+            try {
+                const response = await fetch('/api/sessions');
+                console.log('📡 Response received:', response.status, response.statusText);
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                console.log('📊 Sessions data:', data);
+                
+                availableSessions = data.sessions || [];
+                console.log(`✅ Loaded ${availableSessions.length} sessions`);
+                
+                populateRaceDropdown();
+            } catch (error) {
+                console.error('❌ Error fetching sessions:', error);
+                const select = document.getElementById('raceSelect');
+                select.innerHTML = '<option value="">Error loading races - check console</option>';
+                
+                // Also show error in the UI
+                const errorDiv = document.createElement('div');
+                errorDiv.style.cssText = 'color: #ff6b6b; font-size: 12px; margin-top: 5px;';
+                errorDiv.textContent = `⚠️ Could not load races: ${error.message}`;
+                
+                const raceSelector = document.querySelector('.race-selector');
+                if (raceSelector) {
+                    // Remove any existing error messages
+                    const existingError = raceSelector.querySelector('.error-message');
+                    if (existingError) existingError.remove();
+                    
+                    errorDiv.className = 'error-message';
+                    raceSelector.appendChild(errorDiv);
+                }
+            }
+        }
+
+        function populateRaceDropdown() {
+            console.log('🏁 Populating race dropdown with', availableSessions.length, 'sessions');
+            
+            const select = document.getElementById('raceSelect');
+            const currentSessionId = sessionMetadata.session_id;
+            
+            // Clear existing options
+            select.innerHTML = '';
+            
+            // Add default option
+            select.innerHTML = '<option value="">Select a race...</option>';
+            
+            if (availableSessions.length === 0) {
+                console.warn('⚠️ No sessions available to populate dropdown');
+                select.innerHTML = '<option value="">No races available</option>';
+                return;
+            }
+            
+            // Sort sessions by date (most recent first)
+            const sortedSessions = availableSessions.sort((a, b) => 
+                new Date(b.session_date) - new Date(a.session_date)
+            );
+            
+            console.log('📅 Sorted sessions:', sortedSessions.map(s => `${s.year} ${s.race_name}`));
+            
+            // Add session options
+            sortedSessions.forEach((session, index) => {
+                const option = document.createElement('option');
+                option.value = session.session_id;
+                
+                // Format the display text
+                const date = new Date(session.session_date).toLocaleDateString();
+                const quality = session.window_count ? `${(session.window_count/1000).toFixed(1)}k windows` : 'Unknown quality';
+                
+                option.textContent = `${session.year} ${session.race_name} (${quality})`;
+                
+                // Mark current session as selected
+                if (session.session_id === currentSessionId) {
+                    option.selected = true;
+                    console.log('✅ Current session found and selected:', session.race_name);
+                }
+                
+                select.appendChild(option);
+                console.log(`➕ Added option ${index + 1}:`, option.textContent);
+            });
+            
+            // Enable the load button
+            const loadBtn = document.getElementById('loadRaceBtn');
+            if (loadBtn) {
+                loadBtn.disabled = false;
+                console.log('✅ Load button enabled');
+            }
+            
+            console.log(`✅ Loaded ${availableSessions.length} available races into dropdown`);
+        }
+
+        function loadSelectedRace() {
+            const select = document.getElementById('raceSelect');
+            const selectedSessionId = select.value;
+            
+            if (!selectedSessionId) {
+                alert('Please select a race first!');
+                return;
+            }
+            
+            // Show loading status
+            const loadingStatus = document.getElementById('loadingStatus');
+            const loadBtn = document.getElementById('loadRaceBtn');
+            
+            loadingStatus.style.display = 'inline';
+            loadBtn.disabled = true;
+            loadBtn.textContent = 'Loading...';
+            
+            // Redirect to the selected race
+            window.location.href = `/d3_live/${selectedSessionId}`;
+        }
+
+        // Initialize race selector
+        fetchAvailableSessions();
+
+        // Debug data structure
+        console.log('Live telemetry data loaded:', {
+            drivers: drivers,
+            totalTimesteps: totalTimesteps,
+            totalLaps: totalLaps,
+            firstProbEntry: probabilities ? probabilities[0] : 'undefined',
+            trackDataStructure: trackData ? Object.keys(trackData) : 'undefined',
+            probDataType: typeof probabilities[0],
+            hasTrackStatus: trackData && trackData.trackStatus ? trackData.trackStatus.length : 0,
+            sessionMetadata: sessionMetadata
+        });
+
+        // Animation state
+        let currentTimestep = 0;
+        let isPlaying = false;
+        let animationInterval;
+        let animationSpeed = 300;
+        
+        // Safety car warning system
+        let previousProbability = 0;
+        let probabilityHistory = [];
+        const HISTORY_LENGTH = 10; // Track last 10 timesteps
+        const WARNING_THRESHOLD = 0.01; // 1% increase triggers warning
+        const CRITICAL_THRESHOLD = 0.05; // 5% increase triggers critical warning
+
+        // Only initialize visualizations if we have valid data
+        if (hasValidData) {
+            // Initialize visualizations
+            initBarChart();
+            initTrackMap();
+            setupControls();
+            
+            // Initialize timeline slider with proper max value
+            initializeTimelineSlider();
+            
+            // Update display
+            updateVisualization();
+            updateSessionInfo();
+        } else {
+            // For empty state, still set up basic controls and race selector
+            setupBasicControls();
+        }
+
+        function updateSessionInfo() {
+            // Update timestep info display
+            document.getElementById('timestepInfo').textContent = `Timestep 0 / ${totalTimesteps}`;
+            
+            // Show session metadata in console
+            console.log('Session Info:', {
+                race_name: sessionMetadata.race_name || '{{ race_name }}',
+                year: sessionMetadata.year || '{{ race_year }}',
+                estimated_laps: sessionMetadata.estimated_laps || 71,
+                data_quality: sessionMetadata.data_quality || 0,
+                driver_count: sessionMetadata.driver_count || drivers.length
+            });
+        }
+
+        function initBarChart() {
+            const container = d3.select('#barChart');
+            const containerRect = container.node().getBoundingClientRect();
+            const margin = { top: 20, right: 80, bottom: 30, left: 60 };
+            const width = containerRect.width - margin.left - margin.right;
+            const height = containerRect.height - margin.top - margin.bottom;
+
+            const svg = container.append('svg')
+                .attr('width', containerRect.width)
+                .attr('height', containerRect.height);
+
+            const g = svg.append('g')
+                .attr('transform', `translate(${margin.left},${margin.top})`);
+
+            // Scales
+            const xScale = d3.scaleLinear()
+                .domain([0, 100])
+                .range([0, width]);
+
+            const yScale = d3.scaleBand()
+                .domain(drivers)
+                .range([0, height])
+                .padding(0.1);
+
+            // Axes
+            g.append('g')
+                .attr('class', 'x-axis')
+                .attr('transform', `translate(0,${height})`)
+                .call(d3.axisBottom(xScale).ticks(5))
+                .selectAll('text')
+                .style('fill', 'white');
+
+            g.append('g')
+                .attr('class', 'y-axis')
+                .call(d3.axisLeft(yScale))
+                .selectAll('text')
+                .style('fill', 'white')
+                .style('font-weight', 'bold');
+
+            // Store scales for updates
+            container.datum({ svg, g, xScale, yScale, width, height });
+        }
+
+        function initTrackMap() {
+            const container = d3.select('#trackMap');
+            const containerRect = container.node().getBoundingClientRect();
+            const margin = 20;
+            const width = containerRect.width - 2 * margin;
+            const height = containerRect.height - 2 * margin;
+
+            const svg = container.append('svg')
+                .attr('width', containerRect.width)
+                .attr('height', containerRect.height);
+
+            const g = svg.append('g')
+                .attr('transform', `translate(${margin},${margin})`);
+
+            // Check if track data exists
+            if (!trackData || !trackData.trackPoints || trackData.trackPoints.length === 0) {
+                console.error('No track data available');
+                g.append('text')
+                    .attr('x', width/2)
+                    .attr('y', height/2)
+                    .attr('text-anchor', 'middle')
+                    .style('fill', 'white')
+                    .text('Track data loading...');
+                return;
+            }
+
+            // Calculate bounds of track data
+            const xValues = trackData.trackPoints.map(d => d.x);
+            const yValues = trackData.trackPoints.map(d => d.y);
+            
+            const xMin = Math.min(...xValues);
+            const xMax = Math.max(...xValues);
+            const yMin = Math.min(...yValues);
+            const yMax = Math.max(...yValues);
+            
+            console.log('Track bounds:', { xMin, xMax, yMin, yMax });
+            
+            // Create scales to fit track in container
+            const xScale = d3.scaleLinear()
+                .domain([xMin, xMax])
+                .range([0, width]);
+                
+            const yScale = d3.scaleLinear()
+                .domain([yMin, yMax])
+                .range([height, 0]); // Flip Y axis for SVG
+
+            // Create line generator with scaling
+            const line = d3.line()
+                .x(d => xScale(d.x))
+                .y(d => yScale(d.y))
+                .curve(d3.curveCardinal);
+
+            // Draw track outline
+            g.append('path')
+                .datum(trackData.trackPoints)
+                .attr('class', 'track-outline')
+                .attr('d', line);
+
+            // Store scales and dimensions for updates
+            container.datum({ svg, g, width, height, xScale, yScale });
+        }
+
+        function updateVisualization() {
+            updateBarChart();
+            updateTrackMap();
+            updateStatusPanel();
+            updateProgress();
+        }
+
+        function detectProbabilitySpike(currentProb) {
+            // Add current probability to history
+            probabilityHistory.push(currentProb);
+            if (probabilityHistory.length > HISTORY_LENGTH) {
+                probabilityHistory.shift();
+            }
+            
+            // Calculate rate of change
+            if (probabilityHistory.length >= 2) {
+                const recentChange = currentProb - previousProbability;
+                const avgChange = probabilityHistory.length >= HISTORY_LENGTH 
+                    ? (currentProb - probabilityHistory[0]) / HISTORY_LENGTH
+                    : 0;
+                
+                // Detect spikes
+                if (recentChange >= CRITICAL_THRESHOLD || avgChange >= CRITICAL_THRESHOLD) {
+                    return 'critical';
+                } else if (recentChange >= WARNING_THRESHOLD || avgChange >= WARNING_THRESHOLD) {
+                    return 'warning';
+                }
+            }
+            
+            previousProbability = currentProb;
+            return 'normal';
+        }
+
+        function updateBarChart() {
+            const container = d3.select('#barChart');
+            const { g, xScale, yScale } = container.datum();
+            
+            // Create synthetic probability data for each driver
+            const currentProb = probabilities && currentTimestep < probabilities.length 
+                ? probabilities[currentTimestep] * 100 
+                : 0;
+            
+            const barData = drivers.map((driver, i) => {
+                // Create variation in probabilities for visualization
+                const baseProb = currentProb;
+                const variation = Math.sin((currentTimestep + i * 2) * 0.1) * 5;
+                const driverProb = Math.max(0, Math.min(100, baseProb + variation));
+                
+                return {
+                    driver: driver,
+                    value: driverProb,
+                    color: driverColors[driver] || '#666'
+                };
+            });
+
+            // Bind data
+            const bars = g.selectAll('.bar')
+                .data(barData, d => d.driver);
+
+            // Enter new bars
+            const barEnter = bars.enter().append('g')
+                .attr('class', 'bar');
+
+            barEnter.append('rect')
+                .attr('class', 'bar-rect')
+                .attr('y', d => yScale(d.driver))
+                .attr('height', yScale.bandwidth())
+                .attr('x', 0)
+                .attr('width', 0);
+
+            barEnter.append('text')
+                .attr('class', 'bar-value')
+                .attr('y', d => yScale(d.driver) + yScale.bandwidth() / 2)
+                .attr('x', 5)
+                .style('dominant-baseline', 'middle');
+
+            // Update all bars
+            const barUpdate = barEnter.merge(bars);
+            
+            barUpdate.select('.bar-rect')
+                .transition()
+                .duration(200)
+                .attr('width', d => xScale(d.value))
+                .attr('fill', d => d.color);
+
+            barUpdate.select('.bar-value')
+                .transition()
+                .duration(200)
+                .attr('x', d => xScale(d.value) + 5)
+                .text(d => `${d.value.toFixed(1)}%`);
+        }
+
+        function updateTrackMap() {
+            const container = d3.select('#trackMap');
+            const { g, xScale, yScale } = container.datum();
+            
+            // Add safety checks
+            if (!trackData || !trackData.carPositions || currentTimestep >= trackData.carPositions.length) {
+                console.error('Invalid track data or timestep:', currentTimestep, trackData?.carPositions?.length);
+                return;
+            }
+            
+            const currentCars = trackData.carPositions[currentTimestep];
+            
+            // Check if currentCars is valid
+            if (!currentCars || !Array.isArray(currentCars)) {
+                console.error('No car position data for timestep:', currentTimestep);
+                return;
+            }
+            
+            // Bind car data with scaled positions
+            const cars = g.selectAll('.car')
+                .data(currentCars.filter(car => car && car.driver && !isNaN(car.x) && !isNaN(car.y)), d => d.driver);
+
+            // Enter new cars
+            const carEnter = cars.enter().append('g')
+                .attr('class', 'car');
+
+            carEnter.append('circle')
+                .attr('class', 'car-dot')
+                .attr('r', 8)
+                .attr('fill', d => driverColors[d.driver] || '#666');
+
+            carEnter.append('text')
+                .attr('class', 'car-label')
+                .attr('dy', '0.35em')
+                .style('text-anchor', 'middle')
+                .style('font-size', '10px')
+                .style('font-weight', 'bold')
+                .style('fill', 'white')
+                .text(d => d.driver);
+
+            // Update all cars with proper scaling
+            const carUpdate = carEnter.merge(cars);
+            
+            carUpdate
+                .transition()
+                .duration(200)
+                .attr('transform', d => `translate(${xScale(d.x)},${yScale(d.y)})`);
+
+            // Remove old cars
+            cars.exit().remove();
+        }
+
+        function updateStatusPanel() {
+            const currentLap = Math.ceil((currentTimestep / totalTimesteps) * totalLaps);
+            const sessionMinutes = Math.floor(currentTimestep / 50); // Assuming ~50 timesteps per minute
+            const sessionSeconds = Math.floor((currentTimestep % 50) * 1.2);
+            
+            // Get current probability and detect spikes
+            const currentProb = probabilities ? probabilities[currentTimestep] : 0;
+            const warningLevel = detectProbabilitySpike(currentProb);
+            
+            // Update session time
+            document.getElementById('sessionTime').textContent = 
+                `${String(sessionMinutes).padStart(2, '0')}:${String(sessionSeconds).padStart(2, '0')}`;
+            
+            // Update track status if available
+            if (trackData && trackData.trackStatus && currentTimestep < trackData.trackStatus.length) {
+                const currentStatus = trackData.trackStatus[currentTimestep];
+                const statusPanel = document.getElementById('statusPanel');
+                
+                // Determine status color and icon
+                let statusColor = '#4CAF50'; // Green
+                let statusIcon = '🟢';
+                let statusText = 'All clear - normal racing conditions';
+                
+                if (currentStatus.safety_car) {
+                    statusColor = '#FF9800'; // Orange
+                    statusIcon = '🟠';
+                    statusText = 'Safety Car deployed - reduced speed';
+                } else if (currentStatus.virtual_safety_car) {
+                    statusColor = '#2196F3'; // Blue
+                    statusIcon = '🔵';
+                    statusText = 'Virtual Safety Car - maintain delta times';
+                } else if (currentStatus.red_flag) {
+                    statusColor = '#f44336'; // Red
+                    statusIcon = '🔴';
+                    statusText = 'Session stopped - red flag conditions';
+                }
+                
+                // Create permanent safety car warning panel that changes based on probability
+                let safetyCarPanel = '';
+                let safetyCarClass = '';
+                let safetyCarIcon = '';
+                let safetyCarTitle = '';
+                let safetyCarText = '';
+                
+                if (warningLevel === 'critical') {
+                    safetyCarClass = 'critical';
+                    safetyCarIcon = '🚨';
+                    safetyCarTitle = 'CRITICAL: Safety Car Imminent!';
+                    safetyCarText = `Probability spike detected: ${(currentProb * 100).toFixed(3)}%<br><strong>⚠️ High likelihood of safety car deployment</strong>`;
+                } else if (warningLevel === 'warning') {
+                    safetyCarClass = 'warning';
+                    safetyCarIcon = '⚠️';
+                    safetyCarTitle = 'WARNING: Increased Safety Car Risk';
+                    safetyCarText = `Rising probability: ${(currentProb * 100).toFixed(3)}%<br>Monitor track conditions closely`;
+                } else {
+                    // Normal state - still show the panel but in green/calm state
+                    safetyCarClass = '';
+                    safetyCarIcon = '📊';
+                    safetyCarTitle = 'Safety Car Monitor';
+                    safetyCarText = `Current probability: ${(currentProb * 100).toFixed(3)}%<br>Conditions normal - monitoring ongoing`;
+                }
+                
+                safetyCarPanel = `
+                    <div class="status-item ${safetyCarClass}">
+                        <strong>${safetyCarIcon} ${safetyCarTitle}</strong><br>
+                        ${safetyCarText}
+                    </div>
+                `;
+                
+                // Update status panel content with permanent safety car section
+                statusPanel.innerHTML = `
+                    ${safetyCarPanel}
+                    <div class="status-item" style="border-left-color: ${statusColor}">
+                        <strong>${statusIcon} Track Status: ${currentStatus.track_status}</strong><br>
+                        ${statusText}
+                    </div>
+                    <div class="status-item">
+                        <strong>🏁 Race Info</strong><br>
+                        Lap: ${currentStatus.lap} / ${totalLaps}<br>
+                        Timestep: ${currentTimestep} / ${totalTimesteps}
+                    </div>
+                    <div class="status-item">
+                        <strong>🌡️ Weather</strong><br>
+                        Track: 32°C | Air: 28°C<br>
+                        Humidity: 65% | Wind: 8 km/h
+                    </div>
+                    <div class="status-item">
+                        <strong>⏱️ Session Time</strong><br>
+                        <span id="sessionTime">${String(sessionMinutes).padStart(2, '0')}:${String(sessionSeconds).padStart(2, '0')}</span>
+                    </div>
+                `;
+            }
+        }
+
+        function updateProgress() {
+            const progress = (currentTimestep / totalTimesteps) * 100;
+            
+            // Get actual lap from track data if available
+            let currentLap = Math.ceil((currentTimestep / totalTimesteps) * totalLaps);
+            if (trackData && trackData.trackStatus && currentTimestep < trackData.trackStatus.length) {
+                currentLap = trackData.trackStatus[currentTimestep].lap;
+            }
+            
+            // Get current probability and warning level for progress bar styling
+            const currentProb = probabilities ? probabilities[currentTimestep] : 0;
+            const warningLevel = detectProbabilitySpike(currentProb);
+            
+            const progressFill = document.getElementById('progressFill');
+            progressFill.style.width = `${progress}%`;
+            
+            // Update progress bar appearance based on warning level
+            progressFill.className = 'progress-fill';
+            if (warningLevel === 'critical') {
+                progressFill.classList.add('critical');
+            } else if (warningLevel === 'warning') {
+                progressFill.classList.add('warning');
+            }
+            
+            document.getElementById('lapInfo').textContent = `Lap ${currentLap} / ${totalLaps}`;
+            document.getElementById('timestepInfo').textContent = `Timestep ${currentTimestep} / ${totalTimesteps}`;
+        }
+
+        function setupControls() {
+            document.getElementById('playBtn').addEventListener('click', play);
+            document.getElementById('pauseBtn').addEventListener('click', pause);
+            document.getElementById('restartBtn').addEventListener('click', restart);
+            
+            const speedSlider = document.getElementById('speedSlider');
+            speedSlider.addEventListener('input', (e) => {
+                animationSpeed = parseInt(e.target.value);
+                document.getElementById('speedLabel').textContent = `${animationSpeed}ms`;
+                if (isPlaying) {
+                    pause();
+                    play();
+                }
+            });
+            
+            const timelineSlider = document.getElementById('timelineSlider');
+            timelineSlider.addEventListener('input', (e) => {
+                const sliderValue = parseInt(e.target.value);
+                currentTimestep = Math.floor((sliderValue / 100) * (totalTimesteps - 1));
+                updateTimelineLabel();
+                updateVisualization();
+            });
+            
+            // Race selector controls
+            const raceSelect = document.getElementById('raceSelect');
+            raceSelect.addEventListener('change', (e) => {
+                const loadBtn = document.getElementById('loadRaceBtn');
+                const raceDetails = document.getElementById('raceDetails');
+                const raceInfo = document.getElementById('raceInfo');
+                
+                if (e.target.value) {
+                    loadBtn.disabled = false;
+                    
+                    // Find selected session details
+                    const selectedSession = availableSessions.find(s => s.session_id === e.target.value);
+                    if (selectedSession) {
+                        const date = new Date(selectedSession.session_date).toLocaleDateString('en-US', {
+                            weekday: 'long',
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric'
+                        });
+                        
+                        const qualityLevel = selectedSession.window_count > 35000 ? 'Excellent' : 
+                                           selectedSession.window_count > 25000 ? 'Very Good' : 
+                                           selectedSession.window_count > 15000 ? 'Good' : 'Fair';
+                        
+                        raceInfo.innerHTML = `
+                            📅 <strong>${date}</strong><br>
+                            📊 Data Quality: <strong>${qualityLevel}</strong> (${selectedSession.window_count.toLocaleString()} telemetry windows)<br>
+                            🏎️ Drivers: ${selectedSession.driver_count || 20}<br>
+                            🏁 Expected ~${selectedSession.window_count > 35000 ? '71' : Math.ceil(selectedSession.window_count / 500)} laps
+                        `;
+                        raceDetails.style.display = 'block';
+                    }
+                } else {
+                    loadBtn.disabled = true;
+                    raceDetails.style.display = 'none';
+                }
+            });
+            
+            // Keyboard shortcuts
+            document.addEventListener('keydown', (e) => {
+                switch(e.key) {
+                    case ' ': // Spacebar to play/pause
+                        e.preventDefault();
+                        if (isPlaying) pause(); else play();
+                        break;
+                    case 'r': // R to restart
+                        e.preventDefault();
+                        restart();
+                        break;
+                    case 'ArrowLeft': // Left arrow to go back
+                        e.preventDefault();
+                        if (currentTimestep > 0) {
+                            currentTimestep = Math.max(0, currentTimestep - 10);
+                            updateTimelineSlider();
+                            updateVisualization();
+                        }
+                        break;
+                    case 'ArrowRight': // Right arrow to go forward
+                        e.preventDefault();
+                        if (currentTimestep < totalTimesteps - 1) {
+                            currentTimestep = Math.min(totalTimesteps - 1, currentTimestep + 10);
+                            updateTimelineSlider();
+                            updateVisualization();
+                        }
+                        break;
+                    case 'Enter': // Enter to load selected race
+                        if (document.activeElement === raceSelect && raceSelect.value) {
+                            e.preventDefault();
+                            loadSelectedRace();
+                        }
+                        break;
+                }
+            });
+        }
+
+        function setupBasicControls() {
+            console.log('Setting up basic controls for empty state');
+            
+            // Only set up race selector and keyboard shortcuts for race loading
+            const raceSelect = document.getElementById('raceSelect');
+            if (raceSelect) {
+                raceSelect.addEventListener('change', (e) => {
+                    const loadBtn = document.getElementById('loadRaceBtn');
+                    const raceDetails = document.getElementById('raceDetails');
+                    const raceInfo = document.getElementById('raceInfo');
+                    
+                    if (e.target.value) {
+                        loadBtn.disabled = false;
+                        
+                        // Find selected session details
+                        const selectedSession = availableSessions.find(s => s.session_id === e.target.value);
+                        if (selectedSession) {
+                            const date = new Date(selectedSession.session_date).toLocaleDateString('en-US', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                            });
+                            
+                            const qualityLevel = selectedSession.window_count > 35000 ? 'Excellent' : 
+                                               selectedSession.window_count > 25000 ? 'Very Good' : 
+                                               selectedSession.window_count > 15000 ? 'Good' : 'Fair';
+                            
+                            raceInfo.innerHTML = `
+                                📅 <strong>${date}</strong><br>
+                                📊 Data Quality: <strong>${qualityLevel}</strong> (${selectedSession.window_count.toLocaleString()} telemetry windows)<br>
+                                🏎️ Drivers: ${selectedSession.driver_count || 20}<br>
+                                🏁 Expected ~${selectedSession.window_count > 35000 ? '71' : Math.ceil(selectedSession.window_count / 500)} laps
+                            `;
+                            raceDetails.style.display = 'block';
+                        }
+                    } else {
+                        loadBtn.disabled = true;
+                        raceDetails.style.display = 'none';
+                    }
+                });
+            }
+            
+            // Only keyboard shortcut for race loading
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && document.activeElement === raceSelect && raceSelect.value) {
+                    e.preventDefault();
+                    loadSelectedRace();
+                }
+            });
+            
+            // Initialize race selector
+            fetchAvailableSessions();
+        }
+
+        function initializeTimelineSlider() {
+            const timelineSlider = document.getElementById('timelineSlider');
+            timelineSlider.max = 100; // Use percentage for smooth sliding
+            timelineSlider.value = 0;
+            updateTimelineLabel();
+        }
+
+        function updateTimelineLabel() {
+            // Get actual lap from track data if available
+            const currentLap = trackData && trackData.trackStatus && currentTimestep < trackData.trackStatus.length 
+                ? trackData.trackStatus[currentTimestep].lap 
+                : Math.ceil((currentTimestep / totalTimesteps) * totalLaps);
+                
+            document.getElementById('timelineLabel').textContent = 
+                `Timestep ${currentTimestep} (Lap ${currentLap})`;
+        }
+
+        function play() {
+            if (isPlaying) return;
+            isPlaying = true;
+            
+            animationInterval = setInterval(() => {
+                currentTimestep++;
+                if (currentTimestep >= totalTimesteps) {
+                    currentTimestep = totalTimesteps - 1;
+                    pause();
+                    return;
+                }
+                updateTimelineSlider();
+                updateVisualization();
+            }, animationSpeed);
+        }
+
+        function pause() {
+            isPlaying = false;
+            if (animationInterval) {
+                clearInterval(animationInterval);
+            }
+        }
+
+        function restart() {
+            pause();
+            currentTimestep = 0;
+            updateTimelineSlider();
+            updateVisualization();
+        }
+
+        function updateTimelineSlider() {
+            const timelineSlider = document.getElementById('timelineSlider');
+            const progressPercent = (currentTimestep / (totalTimesteps - 1)) * 100;
+            timelineSlider.value = progressPercent;
+            updateTimelineLabel();
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            // Reinitialize charts on resize
+            d3.select('#barChart').selectAll('*').remove();
+            d3.select('#trackMap').selectAll('*').remove();
+            initBarChart();
+            initTrackMap();
+            updateVisualization();
+        });
+    </script>
+</body>
+</html>
