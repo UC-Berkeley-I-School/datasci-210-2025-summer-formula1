@@ -1,0 +1,19 @@
+meta {
+  name: Make Predictions
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{host}}/api/v1/predict
+  body: json
+  auth: inherit
+}
+
+headers {
+  Content-Type: application/json
+}
+
+body:json {
+  {"session_id":"2024_Mexico City Grand Prix_R"}
+}
