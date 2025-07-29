@@ -1,21 +1,26 @@
 FROM python:3.12-slim
 
+# Set working directory for the application
 WORKDIR /app
 
-# Copy requirements and install dependencies
-COPY model_service/requirements.txt ./
+# Copy Python dependencies and install them.  The requirements file lives at the
+# root of the model_service context, not nested under a second "model_service"
+# directory, so we copy it directly.
+COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy both model_service and database source code into the image
-COPY model_service /app/model_service
-COPY database /app/database
-COPY models /app/models
+# Copy the rest of the service into the image.  This includes the FastAPI
+# application under ``src`` as well as our vendored ``database`` client code.
+COPY . /app
 
-# Set PYTHONPATH so both model_service and database are importable
+# Set PYTHONPATH so that both our code under ``src`` and the vendored
+# ``database`` package are importable.
 ENV PYTHONPATH=/app
 
-WORKDIR /app/model_service
+# Expose the port the FastAPI server listens on.  The compose file maps this
+# port to the host.
+EXPOSE 8000
 
-EXPOSE 8088
-
-CMD ["env", "PYTHONPATH=/app", "uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8088", "--reload"]
+# Run the application.  We don't rely on a ``model_service`` package entry
+# point; instead we invoke uvicorn directly with the module path to the FastAPI app.
+CMD ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
