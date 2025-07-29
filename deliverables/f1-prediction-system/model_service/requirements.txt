@@ -3,9 +3,10 @@ uvicorn[standard]
 pydantic
 numpy
 pandas
-scikit-learn
+scikit-learn==1.7.0
 psycopg2-binary
 redis
 python-dotenv
 joblib
-aeon
+git+https://github.com/aeon-toolkit/aeon.git@main
+git+https://github.com/scikit-learn-contrib/imbalanced-learn@master
