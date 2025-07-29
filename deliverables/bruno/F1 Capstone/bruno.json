@@ -1,0 +1,9 @@
+{
+  "version": "1",
+  "name": "F1 Capstone",
+  "type": "collection",
+  "ignore": [
+    "node_modules",
+    ".git"
+  ]
+}
