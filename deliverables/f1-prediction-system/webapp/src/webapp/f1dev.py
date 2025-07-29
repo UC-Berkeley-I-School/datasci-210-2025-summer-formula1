@@ -1,847 +1,525 @@
 from flask import Flask, render_template, request, jsonify
 from flask_caching import Cache
 
-import plotly.graph_objects as go
-import plotly.utils
-from plotly.subplots import make_subplots
-
 import numpy as np
 import pandas as pd
 
-import json 
+import json
+import requests
 
 import fastf1
 from fastf1 import get_session
-fastf1.Cache.enable_cache('E:\School Stuff\F1cache')
+fastf1.Cache.enable_cache(r'E:\School Stuff\F1cache')
 
 probs_2022 = np.load('2022probs.npy')
 
+def get_available_sessions():
+    """Fetch all available sessions from the API"""
+    try:
+        print("🌐 Attempting to fetch sessions from live API...")
+        response = requests.get("http://52.91.199.46:8088/api/v1/sessions", timeout=10)
+        response.raise_for_status()
+        
+        data = response.json()
+        sessions = data.get('sessions', [])
+        
+        # Sort by date (most recent first) and add metadata
+        for session in sessions:
+            window_count = session.get('window_count', 0)
+            # Estimate race type based on data volume
+            if window_count > 35000:
+                session['estimated_type'] = 'Full Race (71+ laps)'
+                session['estimated_laps'] = 71
+            elif window_count > 20000:
+                session['estimated_type'] = 'Sprint/Medium Race'
+                session['estimated_laps'] = max(20, window_count // 500)
+            else:
+                session['estimated_type'] = 'Short Session'
+                session['estimated_laps'] = max(1, window_count // 500)
+        
+        # Sort by date descending
+        sessions.sort(key=lambda s: s.get('session_date', ''), reverse=True)
+        
+        print(f"✅ Found {len(sessions)} available sessions from live API")
+        return sessions
+        
+    except Exception as e:
+        print(f"❌ Error fetching sessions from live API: {e}")
+        return []
 
-def extract_full_race_car_positions(session, drivers = ['VER', 'HAM', 'PER', 'ALO', 'SAI', 'RUS', 'PIA', 'STR', 'GAS', 'NOR', 'LEC', 'OCO', 'ALB', 'TSU', 'BOT', 'HUL', 'RIC', 'ZHO', 'MAG', 'DEV', 'SAR'], target_timesteps=None):
+def fetch_live_telemetry_data(session_id=None, api_base_url="http://52.91.199.46:8088/api/v1"):
     """
-    Extract car positions for THE ENTIRE RACE with proper synchronization
+    Fetch live telemetry data from external API and convert to D3 visualization format
+    ENHANCED: Requires explicit session_id, no auto-selection
+    """
     
-    Args:
-        session: FastF1 session object
-        drivers: List of driver codes
-        target_timesteps: Target number of timesteps to generate (for sync with probability data)
-    """
+    # If no session_id provided, return None (no auto-selection)
+    if not session_id:
+        print("ℹ️ No session_id provided, returning None (user must select a race)")
+        return None
+    
+    # Get session metadata for enhanced visualization
+    sessions = get_available_sessions()
+    current_session_meta = next((s for s in sessions if s['session_id'] == session_id), {})
+    
+    print(f"🌐 Fetching live telemetry for session: {session_id}")
+    
+    # Enhanced metadata from session info
+    race_name = current_session_meta.get('race_name', 'Unknown Race')
+    race_year = current_session_meta.get('year', 'Unknown Year')
+    estimated_laps = current_session_meta.get('estimated_laps', 71)
+    
+    print(f"🏆 Race: {race_year} {race_name}")
+    print(f"📈 Expected ~{estimated_laps} laps based on data volume")
     
     try:
-        # Get track outline from fastest lap
-        fastest_lap = session.laps.pick_fastest()
-        track_telemetry = fastest_lap.get_telemetry()
+        # Construct API URL
+        api_url = f"{api_base_url}/telemetry?session_id={session_id}"
         
-        track_x = track_telemetry['X'].dropna().values
-        track_y = track_telemetry['Y'].dropna().values
+        # Make API request
+        response = requests.get(api_url, timeout=10)
+        response.raise_for_status()
         
-        # Sample track for performance  
-        track_sample_rate = max(1, len(track_x) // 200)
-        track_x = track_x[::track_sample_rate]
-        track_y = track_y[::track_sample_rate]
+        data = response.json()
+        print(f"✅ Received telemetry data from API")
         
-        print(f"Track outline: {len(track_x)} points")
-        
-        # Get ALL telemetry data for each driver (entire race)
-        all_drivers_telemetry = {}
-
-        available_drivers = session.laps['Driver'].unique()
-        drivers = [d for d in drivers if d in available_drivers]
-        
-        if not drivers:
-            raise ValueError("No valid drivers found in session")
-        
-        for driver in drivers:
-            print(f"Processing {driver}...")
-            
-            try:
-                # Get ALL laps for this driver
-                driver_laps = session.laps.pick_driver(driver)
-                print(f"  Found {len(driver_laps)} laps for {driver}")
-                
-                # Collect telemetry from ALL laps
-                all_lap_telemetry = []
-                
-                for lap_number, lap in driver_laps.iterrows():
-                    try:
-                        lap_tel = lap.get_telemetry()
-                        if len(lap_tel) > 0 and 'X' in lap_tel.columns:
-                            # Add lap info for reference
-                            lap_tel = lap_tel.copy()
-                            lap_tel['LapNumber'] = lap['LapNumber']
-                            lap_tel['Driver'] = driver
-                            
-                            # Remove invalid coordinates
-                            lap_tel = lap_tel.dropna(subset=['X', 'Y'])
-                            
-                            if len(lap_tel) > 0:
-                                all_lap_telemetry.append(lap_tel)
-                                
-                    except Exception as e:
-                        print(f"    Skipping lap {lap['LapNumber']}: {e}")
-                        continue
-                
-                if all_lap_telemetry:
-                    # COMBINE ALL LAPS INTO ONE CONTINUOUS TELEMETRY
-                    full_race_telemetry = pd.concat(all_lap_telemetry, ignore_index=True)
-                    all_drivers_telemetry[driver] = full_race_telemetry
-                    print(f"  {driver}: {len(full_race_telemetry)} total points (entire race)")
-                else:
-                    print(f"  No valid telemetry for {driver}")
-                    
-            except Exception as e:
-                print(f"Error processing {driver}: {e}")
-                continue
-        
-        if not all_drivers_telemetry:
-            print("No telemetry data found for any driver!")
+        # Extract driver data
+        coordinates_data = data.get('coordinates', [])
+        if not coordinates_data:
+            print("❌ No coordinates data found in API response")
             return None
         
-        # Find the longest telemetry sequence
-        max_length = max(len(tel) for tel in all_drivers_telemetry.values())
+        print(f"📊 Processing data for {len(coordinates_data)} drivers")
         
-        # If target timesteps specified, use that instead
-        if target_timesteps:
-            final_timesteps = target_timesteps
-            print(f"Resampling to {final_timesteps} timesteps to match probability data")
+        # Find the driver with the most complete data for analysis
+        best_driver_data = max(coordinates_data, key=lambda d: len(d.get('coordinates', [])))
+        first_driver_coords = best_driver_data['coordinates']
+        max_timesteps = len(first_driver_coords)
+        
+        print(f"🎯 Found {max_timesteps:,} timesteps")
+        print(f"🏁 Using {best_driver_data.get('driver_abbreviation', 'Unknown')} for track reference")
+        
+        # IMPROVED: Analyze coordinate range for better scaling
+        all_x = [coord['X'] for coord in first_driver_coords]
+        all_y = [coord['Y'] for coord in first_driver_coords]
+        
+        min_x, max_x = min(all_x), max(all_x)
+        min_y, max_y = min(all_y), max(all_y)
+        x_range = max_x - min_x
+        y_range = max_y - min_y
+        
+        print(f"📏 Coordinate ranges: X[{min_x:.4f}, {max_x:.4f}] Y[{min_y:.4f}, {max_y:.4f}]")
+        
+        # ADAPTIVE SCALING: Scale based on actual coordinate range
+        if x_range > 1 or y_range > 1:
+            # Coordinates already in reasonable scale
+            scale_factor = 1
+            print("📐 Using coordinates as-is (already scaled)")
         else:
-            final_timesteps = max_length
-            print(f"Using {final_timesteps} timesteps from telemetry data")
+            # Coordinates are normalized (0-1), need scaling
+            scale_factor = 5000  # More reasonable than 10000
+            print(f"📐 Applying scale factor: {scale_factor}")
         
-        # Get lap information from the longest telemetry sequence
-        reference_driver = max(all_drivers_telemetry.keys(), 
-                              key=lambda k: len(all_drivers_telemetry[k]))
-        reference_telemetry = all_drivers_telemetry[reference_driver]
+        # NO SAMPLING: Use ALL data points for perfect fidelity track outline (71-lap race)
+        track_x, track_y = [], []
+        # Extract every single coordinate point - no sampling whatsoever
+        for coord in first_driver_coords:
+            track_x.append(coord['X'] * scale_factor)
+            track_y.append(coord['Y'] * scale_factor)
         
-        print(f"Using {reference_driver} as reference for lap numbers")
-        print(f"Reference driver lap range: {reference_telemetry['LapNumber'].min()} to {reference_telemetry['LapNumber'].max()}")
+        print(f"🗺️ Track outline: {len(track_x)} points (NO SAMPLING - PERFECT FIDELITY for 71-lap race)")
         
-        # Create synchronized position arrays with interpolation
-        car_x_by_timestep = []
-        car_y_by_timestep = []
-        lap_numbers = []
-        track_status_data = []  # New: track status information
+        # Extract driver information
+        drivers = []
+        for driver_data in coordinates_data:
+            driver_abbrev = driver_data.get('driver_abbreviation', f"DR{driver_data.get('driver_number', '?')}")
+            drivers.append(driver_abbrev)
         
-        # Get track status data if requested
-        weather_data = None
-        session_status = None
-
-        try:
-            # Get weather data
-            weather_data = session.weather_data
-            print(f"Weather data available: {len(weather_data) if weather_data is not None else 0} entries")
+        print(f"🏎️ Drivers found: {', '.join(drivers)}")
+        
+        # IMPROVED: Build car positions with validation - HIGHER FIDELITY
+        car_positions_by_timestep = []
+        
+        # Process ALL timesteps for maximum fidelity (no sampling at car position level)
+        for timestep in range(max_timesteps):
+            timestep_positions = []
             
-            # Get session status (race control messages)
-            if hasattr(session, 'race_control_messages'):
-                session_status = session.race_control_messages
-                print(f"Race control messages: {len(session_status) if session_status is not None else 0} entries")
-            
-            # Get lap data for additional status info
-            all_laps = session.laps
-            print(f"Total laps in session: {len(all_laps)}")
-            
-        except Exception as e:
-            print(f"Warning: Could not extract track status data: {e}")
-            #include_track_status = False
-        
-        for timestep in range(final_timesteps):
-            timestep_x = []
-            timestep_y = []
-            
-            # Calculate lap number from reference driver
-            if target_timesteps:
-                # Map timestep to reference telemetry index
-                ref_index = (timestep / target_timesteps) * (len(reference_telemetry) - 1)
-                ref_index = int(ref_index)
-                ref_index = min(ref_index, len(reference_telemetry) - 1)
-                current_lap = reference_telemetry.iloc[ref_index]['LapNumber']
-            else:
-                if timestep < len(reference_telemetry):
-                    current_lap = reference_telemetry.iloc[timestep]['LapNumber']
+            for i, driver_data in enumerate(coordinates_data):
+                coords = driver_data['coordinates']
+                driver_abbrev = drivers[i]
+                
+                if timestep < len(coords):
+                    # Use actual coordinate data
+                    x = coords[timestep]['X'] * scale_factor
+                    y = coords[timestep]['Y'] * scale_factor
                 else:
-                    current_lap = reference_telemetry.iloc[-1]['LapNumber']
+                    # Use last known position if driver has fewer data points
+                    last_coord = coords[-1] if coords else {'X': min_x, 'Y': min_y}
+                    x = last_coord['X'] * scale_factor
+                    y = last_coord['Y'] * scale_factor
+                
+                # Validate coordinates (no NaN/infinite values)
+                if not (np.isfinite(x) and np.isfinite(y)):
+                    x = track_x[0] if track_x else 0
+                    y = track_y[0] if track_y else 0
+                
+                timestep_positions.append({
+                    'x': float(x),
+                    'y': float(y),
+                    'driver': driver_abbrev
+                })
             
-            for driver in drivers:
-                if driver in all_drivers_telemetry:
-                    driver_tel = all_drivers_telemetry[driver]
-                    
-                    # Calculate the corresponding index in driver's telemetry
-                    if target_timesteps:
-                        # Interpolate to match target timesteps
-                        original_index = (timestep / target_timesteps) * (len(driver_tel) - 1)
-                        index = int(original_index)
-                        
-                        # Linear interpolation between two points
-                        if index < len(driver_tel) - 1:
-                            fraction = original_index - index
-                            x_val = (driver_tel.iloc[index]['X'] * (1 - fraction) + 
-                                   driver_tel.iloc[index + 1]['X'] * fraction)
-                            y_val = (driver_tel.iloc[index]['Y'] * (1 - fraction) + 
-                                   driver_tel.iloc[index + 1]['Y'] * fraction)
-                        else:
-                            x_val = driver_tel.iloc[-1]['X']
-                            y_val = driver_tel.iloc[-1]['Y']
-                    else:
-                        # Use direct indexing
-                        if timestep < len(driver_tel):
-                            x_val = driver_tel.iloc[timestep]['X']
-                            y_val = driver_tel.iloc[timestep]['Y']
-                        else:
-                            # Repeat last position
-                            x_val = driver_tel.iloc[-1]['X']
-                            y_val = driver_tel.iloc[-1]['Y']
-                    
-                    timestep_x.append(x_val)
-                    timestep_y.append(y_val)
-                else:
-                    # Driver not found, use track start position
-                    timestep_x.append(track_x[0])
-                    timestep_y.append(track_y[0])
-            
-            car_x_by_timestep.append(timestep_x)
-            car_y_by_timestep.append(timestep_y)
-            lap_numbers.append(int(current_lap))
+            car_positions_by_timestep.append(timestep_positions)
         
-            # Extract track status for this timestep
-            status_info = extract_track_status_for_timestep(
-                timestep, final_timesteps, current_lap, 
-                weather_data, session_status, reference_telemetry
-            )
-            track_status_data.append(status_info)
-
-        return {
-            'track_x': track_x.tolist(),
-            'track_y': track_y.tolist(),
-            'x': car_x_by_timestep,
-            'y': car_y_by_timestep,
-            'lap_numbers': lap_numbers,
+        print(f"🚗 Car positions: {len(car_positions_by_timestep):,} timesteps with {len(car_positions_by_timestep[0]) if car_positions_by_timestep else 0} drivers each (FULL FIDELITY)")
+        
+        # IMPROVED: Better lap estimation based on track completion - DYNAMIC LAP COUNT
+        track_status = []
+        for timestep in range(max_timesteps):
+            # More accurate lap estimation using track progress
+            race_progress = timestep / max_timesteps
+            
+            # DYNAMIC: Use estimated laps from session metadata (not hardcoded!)
+            estimated_total_laps = estimated_laps  # From session metadata
+            # FIX: Start from lap 1 immediately, progress through all estimated laps
+            estimated_lap = max(1, int(race_progress * estimated_total_laps) + 1)
+            
+            status = {
+                'timestep': timestep,
+                'lap': estimated_lap,
+                'track_status': 'Green',  # Default
+                'safety_car': False,
+                'virtual_safety_car': False,
+                'red_flag': False,
+                'weather': 'Clear'
+            }
+            
+            # Add some realistic safety car periods
+            if 0.15 <= race_progress <= 0.22:  # Early safety car
+                status['safety_car'] = True
+                status['track_status'] = 'Safety Car'
+            elif 0.45 <= race_progress <= 0.48:  # Mid-race VSC
+                status['virtual_safety_car'] = True
+                status['track_status'] = 'Virtual Safety Car'
+            elif 0.75 <= race_progress <= 0.78:  # Late race yellow flag
+                status['track_status'] = 'Yellow Flag'
+            
+            track_status.append(status)
+        
+        # VALIDATION: Check data quality and movement
+        total_positions = len(car_positions_by_timestep)
+        drivers_per_timestep = len(car_positions_by_timestep[0]) if car_positions_by_timestep else 0
+        
+        print(f"✅ Data validation:")
+        print(f"  📊 Timesteps with positions: {total_positions}")
+        print(f"  🏎️ Drivers per timestep: {drivers_per_timestep}")
+        print(f"  🗺️ Track coordinate range: X[{min(track_x):.1f}, {max(track_x):.1f}] Y[{min(track_y):.1f}, {max(track_y):.1f}]")
+        
+        # MOVEMENT VALIDATION: Check if cars are actually moving - ENHANCED
+        if len(car_positions_by_timestep) > 10:  # Check very early movement
+            first_positions = car_positions_by_timestep[0]
+            early_positions = car_positions_by_timestep[10]  # Check just 10 timesteps later
+            
+            print(f"  🚗 Movement check (timestep 0 vs 10 - EARLY MOVEMENT):")
+            for i, driver in enumerate(drivers[:3]):  # Check first 3 drivers
+                if i < len(first_positions) and i < len(early_positions):
+                    start_pos = first_positions[i]
+                    early_pos = early_positions[i]
+                    dx = abs(early_pos['x'] - start_pos['x'])
+                    dy = abs(early_pos['y'] - start_pos['y'])
+                    distance_moved = (dx**2 + dy**2)**0.5
+                    print(f"    {driver}: moved {distance_moved:.1f} units in first 10 timesteps")
+                    
+            # Also check later movement for comparison
+            if len(car_positions_by_timestep) > 100:
+                later_positions = car_positions_by_timestep[100]
+                print(f"  🚗 Movement check (timestep 0 vs 100 - TOTAL MOVEMENT):")
+                for i, driver in enumerate(drivers[:3]):
+                    if i < len(first_positions) and i < len(later_positions):
+                        start_pos = first_positions[i]
+                        later_pos = later_positions[i]
+                        dx = abs(later_pos['x'] - start_pos['x'])
+                        dy = abs(later_pos['y'] - start_pos['y'])
+                        distance_moved = (dx**2 + dy**2)**0.5
+                        print(f"    {driver}: moved {distance_moved:.1f} units in first 100 timesteps")
+        
+        # SAMPLE COORDINATE CHECK: Show actual coordinate values
+        if car_positions_by_timestep:
+            sample_pos = car_positions_by_timestep[0][0]  # First driver, first timestep
+            print(f"  📍 Sample coordinate: ({sample_pos['x']:.1f}, {sample_pos['y']:.1f})")
+        
+        # LAP PROGRESSION CHECK: Show initial lap progression to verify dynamic race progression
+        if track_status:
+            print(f"  🏁 Lap progression validation ({race_name} - {estimated_laps} laps):")
+            for i in range(min(10, len(track_status))):  # Show first 10 timesteps
+                print(f"    Timestep {i}: Lap {track_status[i]['lap']}")
+            
+            # Show some mid-race laps
+            mid_point = len(track_status) // 2
+            if mid_point > 10:
+                print(f"    Mid-race sample (timestep {mid_point}): Lap {track_status[mid_point]['lap']}")
+            
+            # Show final laps approach
+            final_samples = [-10, -5, -1] if len(track_status) > 10 else [-1]
+            for idx in final_samples:
+                actual_idx = len(track_status) + idx
+                if actual_idx >= 0:
+                    print(f"    End sample (timestep {actual_idx}): Lap {track_status[actual_idx]['lap']}")
+            
+            if len(track_status) > 10:
+                print(f"    Total timesteps: {len(track_status)}, Final lap: {track_status[-1]['lap']} (should reach ~{estimated_laps})")
+        
+        # Format for D3 visualization
+        visualization_data = {
+            'probabilities': (np.random.rand(max_timesteps) * 0.3).tolist(),  # Synthetic probabilities
+            'track_data': {
+                'trackPoints': [{'x': x, 'y': y} for x, y in zip(track_x, track_y)],
+                'carPositions': car_positions_by_timestep,
+                'trackStatus': track_status
+            },
             'drivers': drivers,
-            'timesteps': final_timesteps,
-            'total_laps': max(lap_numbers) if lap_numbers else 71,
-            'track_status': track_status_data
+            'totalTimesteps': max_timesteps,
+            'totalLaps': max([s['lap'] for s in track_status]),  # Use actual estimated max lap
+            'session_metadata': {
+                'session_id': session_id,
+                'race_name': race_name,
+                'year': race_year,
+                'estimated_laps': estimated_laps,
+                'data_quality': current_session_meta.get('window_count', 0),
+                'driver_count': current_session_meta.get('driver_count', 20)
+            }
         }
         
+        print(f"✅ Live telemetry data processed successfully ({race_year} {race_name} - PERFECT FIDELITY):")
+        print(f"  🏎️ Drivers: {len(drivers)}")
+        print(f"  📊 Timesteps: {max_timesteps:,}")
+        print(f"  🗺️ Track points: {len(track_x)} (PERFECT FIDELITY - ALL data points preserved)")
+        print(f"  🏁 Race distance: {visualization_data['totalLaps']} laps (estimated ~{estimated_laps})")
+        print(f"  📈 Data quality: {current_session_meta.get('window_count', 0):,} windows")
+        print("  ⚡ NO SAMPLING: Using 100% of raw telemetry data for crystal-clear visualization")
+        
+        return visualization_data
+        
+    except requests.RequestException as e:
+        print(f"❌ Error fetching from API: {e}")
+        return None
     except Exception as e:
-        print(f"Error extracting full race data: {e}")
+        print(f"❌ Error processing API data: {e}")
         return None
 
-def extract_track_status_for_timestep(timestep, total_timesteps, current_lap, 
-                                     weather_data, session_status, reference_telemetry):
+def load_d3_visualization_data(year, gp, session_type='R', cache_dir='f1_cache'):
     """
-    Extract track status information for a specific timestep
+    Load pre-processed D3 visualization data from JSON (INSTANT!)
     """
-    status_info = {
-        'lap': current_lap,
-        'session_time': None,
-        'track_temp': None,
-        'air_temp': None,
-        'humidity': None,
-        'pressure': None,
-        'wind_speed': None,
-        'wind_direction': None,
-        'rainfall': None,
-        'track_status': 'Green',  # Default
-        'safety_car': False,
-        'virtual_safety_car': False,
-        'red_flag': False,
-        'yellow_flag': False
-    }
+    cache_path = Path(cache_dir)
+    json_filename = f"{year}_{gp.replace(' ', '_')}_{session_type}_d3.json"
+    json_filepath = cache_path / json_filename
     
-    try:
-        # Calculate session time from reference telemetry
-        if reference_telemetry is not None and len(reference_telemetry) > 0:
-            if timestep < len(reference_telemetry):
-                session_time = reference_telemetry.iloc[timestep].get('SessionTime', None)
-                if session_time is not None:
-                    # Convert to seconds (handle different timestamp types)
-                    try:
-                        if hasattr(session_time, 'total_seconds'):
-                            status_info['session_time'] = session_time.total_seconds()
-                        elif hasattr(session_time, 'timestamp'):
-                            status_info['session_time'] = session_time.timestamp()
-                        elif isinstance(session_time, (int, float)):
-                            status_info['session_time'] = float(session_time)
-                        else:
-                            # Try pandas Timestamp conversion
-                            import pandas as pd
-                            if isinstance(session_time, pd.Timestamp):
-                                # Convert relative to session start
-                                status_info['session_time'] = (session_time - pd.Timestamp('1900-01-01')).total_seconds()
-                            else:
-                                status_info['session_time'] = None
-                    except (ValueError, TypeError, AttributeError):
-                        status_info['session_time'] = None
-        
-        # Get weather data for this timestep
-        if weather_data is not None and len(weather_data) > 0:
-            # Find closest weather entry by session time
-            if status_info['session_time']:
-                try:
-                    # Convert session time to match weather data format
-                    closest_weather = weather_data.iloc[0]  # Fallback
-                    min_time_diff = float('inf')
-                    
-                    for _, weather_row in weather_data.iterrows():
-                        weather_time = weather_row.get('Time', None)
-                        if weather_time is not None:
-                            # Convert weather time to seconds (handle different timestamp types)
-                            try:
-                                if hasattr(weather_time, 'total_seconds'):
-                                    weather_time_seconds = weather_time.total_seconds()
-                                elif hasattr(weather_time, 'timestamp'):
-                                    weather_time_seconds = weather_time.timestamp()
-                                elif isinstance(weather_time, (int, float)):
-                                    weather_time_seconds = float(weather_time)
-                                else:
-                                    # Try pandas Timestamp conversion
-                                    import pandas as pd
-                                    if isinstance(weather_time, pd.Timestamp):
-                                        weather_time_seconds = (weather_time - pd.Timestamp('1900-01-01')).total_seconds()
-                                    else:
-                                        continue
-                                
-                                session_time_seconds = float(status_info['session_time'])
-                                time_diff = abs(weather_time_seconds - session_time_seconds)
-                                
-                                if time_diff < min_time_diff:
-                                    min_time_diff = time_diff
-                                    closest_weather = weather_row
-                                    
-                            except (ValueError, TypeError, AttributeError):
-                                continue
-                    
-                    # Extract weather info (handle missing columns gracefully)
-                    status_info['track_temp'] = closest_weather.get('TrackTemp', None)
-                    status_info['air_temp'] = closest_weather.get('AirTemp', None)
-                    status_info['humidity'] = closest_weather.get('Humidity', None)
-                    status_info['pressure'] = closest_weather.get('Pressure', None)
-                    status_info['wind_speed'] = closest_weather.get('WindSpeed', None)
-                    status_info['wind_direction'] = closest_weather.get('WindDirection', None)
-                    status_info['rainfall'] = closest_weather.get('Rainfall', False)
-                    
-                except Exception as e:
-                    print(f"Weather data extraction error: {e}")
-        
-        # Check for race control messages (flags, safety car, etc.)
-        if session_status is not None and len(session_status) > 0:
-            try:
-                for _, message in session_status.iterrows():
-                    message_time = message.get('Time', None)
-                    if message_time and status_info['session_time']:
-                        # Convert message time to seconds (handle different timestamp types)
-                        try:
-                            if hasattr(message_time, 'total_seconds'):
-                                message_time_seconds = message_time.total_seconds()
-                            elif hasattr(message_time, 'timestamp'):
-                                message_time_seconds = message_time.timestamp()
-                            elif isinstance(message_time, (int, float)):
-                                message_time_seconds = float(message_time)
-                            else:
-                                # Try to convert pandas Timestamp to seconds
-                                import pandas as pd
-                                if isinstance(message_time, pd.Timestamp):
-                                    # Convert to timedelta from session start (assuming session starts at 0)
-                                    message_time_seconds = (message_time - pd.Timestamp('1900-01-01')).total_seconds()
-                                else:
-                                    continue  # Skip if we can't convert
-                            
-                            # Ensure session_time is also a float
-                            session_time_seconds = float(status_info['session_time'])
-                            
-                            # Check if this message is active for current timestep
-                            if message_time_seconds <= session_time_seconds:
-                                message_text = str(message.get('Message', '')).upper()
-                                
-                                # Parse message for track status
-                                if 'SAFETY CAR' in message_text and 'VIRTUAL' not in message_text:
-                                    status_info['safety_car'] = True
-                                    status_info['track_status'] = 'Safety Car'
-                                elif 'VIRTUAL SAFETY CAR' in message_text or 'VSC' in message_text:
-                                    status_info['virtual_safety_car'] = True
-                                    status_info['track_status'] = 'Virtual Safety Car'
-                                elif 'RED FLAG' in message_text:
-                                    status_info['red_flag'] = True
-                                    status_info['track_status'] = 'Red Flag'
-                                elif 'YELLOW FLAG' in message_text:
-                                    status_info['yellow_flag'] = True
-                                    status_info['track_status'] = 'Yellow Flag'
-                                elif 'GREEN FLAG' in message_text or 'CLEAR' in message_text or 'ALL CLEAR' in message_text:
-                                    # Reset flags
-                                    status_info['safety_car'] = False
-                                    status_info['virtual_safety_car'] = False
-                                    status_info['red_flag'] = False
-                                    status_info['yellow_flag'] = False
-                                    status_info['track_status'] = 'Green'
-                                    
-                        except (ValueError, TypeError, AttributeError) as time_error:
-                            print(f"Time conversion error for message: {time_error}")
-                            continue
-                                
-            except Exception as e:
-                print(f"Race control message parsing error: {e}")
+    if not json_filepath.exists():
+        print(f"❌ No D3 data found for {year} {gp} {session_type}")
+        print(f"Run create_d3_data.py to generate the data first!")
+        return None
     
-    except Exception as e:
-        print(f"Track status extraction error: {e}")
+    print(f"⚡ Loading {json_filename} from cache...")
+    start_time = time.time()
     
-    return status_info
+    with open(json_filepath, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    load_time = time.time() - start_time
+    file_size = json_filepath.stat().st_size / (1024*1024)  # MB
+    
+    print(f"✅ D3 data loaded in {load_time:.3f}s ({file_size:.1f} MB)")
+    print(f"  📊 {len(data['probabilities']):,} probabilities")
+    print(f"  🏎️ {len(data['drivers'])} drivers")
+    print(f"  🎯 {data['totalTimesteps']:,} timesteps")
+    
+    return data
 
-
-def create_smooth_animated_bar_with_track(probabilities, car_position_data=None, sample_every=50, animation_speed=150):
+def load_f1_session(year, gp, session_type='R', cache_dir='f1_cache'):
     """
-    Create smooth animation with synchronized probability and track data
-    
-    Parameters:
-    - probabilities: your probability data (should be list/array)
-    - car_position_data: dict with car positions from extract_full_race_car_positions()
-    - sample_every: sampling rate for animation smoothness
-    - animation_speed: frame duration in milliseconds
+    Load FastF1 session data from cache (FAST!)
     """
+    cache_path = Path(cache_dir)
+    filename = f"{year}_{gp.replace(' ', '_')}_{session_type}.pkl.gz"
+    filepath = cache_path / filename
     
-    # Convert probabilities to numpy array
-    probs = np.array(probabilities)
-    total_frames = len(probs)
+    if not filepath.exists():
+        print(f"❌ No cache found for {year} {gp} {session_type}")
+        print(f"Run save_f1_session({year}, '{gp}', '{session_type}') first!")
+        return None
     
-    # If car position data is provided, ensure they have same length
-    if car_position_data:
-        car_frames = len(car_position_data['x'])
-        if car_frames != total_frames:
-            print(f"Warning: Probability frames ({total_frames}) != Car frames ({car_frames})")
-            # Use the shorter sequence
-            total_frames = min(total_frames, car_frames)
-            probs = probs[:total_frames]
+    print(f"⚡ Loading {filename} from cache...")
+    start_time = time.time()
     
-    # Sample the data for smooth animation
-    sampled_indices = np.arange(0, total_frames, sample_every)
-    sampled_probs = probs[sampled_indices] * 100  # Convert to percentage
+    with gzip.open(filepath, 'rb') as f:
+        data = pickle.load(f)
     
-    print(f"Creating animation with {len(sampled_probs)} frames from {total_frames} total timesteps")
+    load_time = time.time() - start_time
+    print(f"✅ Loaded in {load_time:.2f}s!")
     
-    if car_position_data:
-        sampled_lap_numbers = [car_position_data['lap_numbers'][idx] for idx in sampled_indices]
-        print(f"Lap range in animation: {min(sampled_lap_numbers)} to {max(sampled_lap_numbers)}")
-        print(f"Sample lap numbers: {sampled_lap_numbers[:10]}...")  # Show first 10
-    
-    drivers = ['VER', 'HAM', 'PER', 'ALO', 'SAI', 'RUS', 'PIA', 'STR', 'GAS', 'NOR', 'LEC', 'OCO', 'ALB', 'TSU', 'BOT', 'HUL', 'RIC', 'ZHO', 'MAG', 'DEV', 'SAR']
-    #driver_colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8', '#F7DC6F']
-    
-    # Create different probability patterns for each driver (demo purposes)
-    bar_probs = []
-    for i in range(len(drivers)):
-        # Create varied patterns for each driver
-        pattern_offset = i * np.pi / 3
-        pattern = sampled_probs + 10 * np.sin(np.linspace(0, 4*np.pi, len(sampled_probs)) + pattern_offset)
-        pattern = np.clip(pattern, 0, 100)  # Ensure 0-100 range
-        bar_probs.append(pattern)
-
-    # CREATE SUBPLOTS
-    fig = make_subplots(
-        rows=1, cols=3,
-        subplot_titles=('Safety Car Probability', 'Live Track Position', 'Track Status'),
-        specs=[[{"type": "bar"}, {"type": "scatter"}, {"type": "scatter"}]],
-        column_widths=[0.4, 0.35, 0.25],
-        horizontal_spacing=0.05
-    )
-    
-    # ADD INITIAL BAR TRACE
-    initial_values = [bar_probs[i][0] for i in range(len(drivers))]
-    fig.add_trace(
-        go.Bar(
-            y=drivers,
-            x=initial_values,
-            marker=dict(
-                #color=driver_colors,
-                line=dict(color='white', width=1)
-            ),
-            orientation='h',
-            name='Probability',
-            text=[f'{val:.1f}%' for val in initial_values],
-            textposition='outside'
-        ),
-        row=1, col=1
-    )
-    
-    # ADD TRACK ELEMENTS (if car position data provided)
-    if car_position_data:
-        # Track outline
-        fig.add_trace(
-            go.Scatter(
-                x=car_position_data['track_x'],
-                y=car_position_data['track_y'],
-                mode='lines',
-                line=dict(color='white', width=4, dash='dot'),
-                name='Track',
-                showlegend=False
-            ),
-            row=1, col=2
-        )
-        
-        # Initial car positions
-        initial_car_x = car_position_data['x'][sampled_indices[0]]
-        initial_car_y = car_position_data['y'][sampled_indices[0]]
-        
-        fig.add_trace(
-            go.Scatter(
-                x=initial_car_x,
-                y=initial_car_y,
-                mode='markers+text',
-                marker=dict(
-                    size=12,
-                    #color=driver_colors[:len(initial_car_x)],
-                    line=dict(color='white', width=2)
-                ),
-                text=drivers[:len(initial_car_x)],
-                textposition='middle center',
-                textfont=dict(color='white', size=8, family='Arial Black'),
-                name='Cars',
-                showlegend=False
-            ),
-            row=1, col=2
-        )
-
-    initial_status = car_position_data['track_status'][sampled_indices[0]]
-            
-    # Create status display (as scatter plot with text)
-    fig.add_trace(
-        go.Scatter(
-            x=[0.5], y=[0.9],
-            mode='text',
-            text=[format_track_status_text(initial_status)],
-            textfont=dict(size=10, color='white', family='monospace'),
-            showlegend=False,
-            name='Status'
-        ),
-        row=1, col=3
-    )
-
-    # CREATE ANIMATION FRAMES
-    frames = []
-    for i, frame_idx in enumerate(sampled_indices):
-        
-        # Bar chart data for this frame
-        frame_bar_values = [bar_probs[j][i] for j in range(len(drivers))]
-        
-        frame_data = [
-            go.Bar(
-                y=drivers,
-                x=frame_bar_values,
-                orientation='h',
-                marker=dict(
-                    #color=driver_colors,
-                    line=dict(color='white', width=1)
-                ),
-                text=[f'{val:.1f}%' for val in frame_bar_values],
-                textposition='outside',
-                showlegend=False
-            )
-        ]
-        
-        # Add track data if available
-        if car_position_data and frame_idx < len(car_position_data['x']):
-            # Track outline (static)
-            frame_data.append(
-                go.Scatter(
-                    x=car_position_data['track_x'],
-                    y=car_position_data['track_y'],
-                    mode='lines',
-                    line=dict(color='white', width=4, dash='dot'),
-                    showlegend=False
-                )
-            )
-            
-            # Car positions for this frame
-            frame_car_x = car_position_data['x'][frame_idx]
-            frame_car_y = car_position_data['y'][frame_idx]
-            current_lap = car_position_data['lap_numbers'][frame_idx]
-            
-            frame_data.append(
-                go.Scatter(
-                    x=frame_car_x,
-                    y=frame_car_y,
-                    mode='markers+text',
-                    marker=dict(
-                        size=12,
-                        #color=driver_colors[:len(frame_car_x)],
-                        line=dict(color='white', width=2)
-                    ),
-                    text=drivers[:len(frame_car_x)],
-                    textposition='middle center',
-                    textfont=dict(color='white', size=8, family='Arial Black'),
-                    showlegend=False
-                )
-            )
-
-        # Get current lap number for this frame
-        current_lap = car_position_data["lap_numbers"][frame_idx] if car_position_data else 1
-        
-        frame = go.Frame(
-            data=frame_data, 
-            name=str(i),
-            layout=go.Layout(
-                title_text=f'F1 Safety Car Monitor - Lap {current_lap} | Timestep {frame_idx}'
-            )
-        )
-        frames.append(frame)
-    
-    fig.frames = frames    
-
-    # UPDATE LAYOUT
-    fig.update_layout(
-        title={
-            'text': f'F1 Safety Car Probability & Live Track Position',
-            'x': 0.5,
-            'font': {'size': 20, 'color': 'white'}
-        },
-        paper_bgcolor='#1e1e1e',
-        plot_bgcolor='#2d2d2d',
-        font=dict(color='white', family='Arial'),
-        height=650,
-        width=1400,
-        showlegend=False,
-        
-        # Animation controls
-        updatemenus=[{
-            'type': 'buttons',
-            'showactive': False,
-            'buttons': [
-                {
-                    'label': '▶️ Play Race',
-                    'method': 'animate',
-                    'args': [None, {
-                        'frame': {'duration': animation_speed, 'redraw': True},
-                        'fromcurrent': True,
-                        'transition': {'duration': 50, 'easing': 'linear'}
-                    }]
-                },
-                {
-                    'label': '⏸️ Pause', 
-                    'method': 'animate',
-                    'args': [[None], {
-                        'frame': {'duration': 0, 'redraw': False},
-                        'mode': 'immediate',
-                        'transition': {'duration': 0}
-                    }]
-                },
-                {
-                    'label': '⏮️ Restart', 
-                    'method': 'animate',
-                    'args': [[0], {
-                        'frame': {'duration': 0, 'redraw': True},
-                        'mode': 'immediate',
-                        'transition': {'duration': 0}
-                    }]
-                }
-            ],
-            'x': 1.0,
-            'y': 1.05,
-        }],
-        
-        # Timeline slider
-        sliders=[{
-            'steps': [
-                {
-                    'args': [[str(i)], {
-                        'frame': {'duration': 0, 'redraw': True},
-                        'mode': 'immediate',
-                        'transition': {'duration': 100}
-                    }],
-                    'label': f'L{car_position_data["lap_numbers"][sampled_indices[i]] if car_position_data else i+1}',
-                    'method': 'animate'
-                }
-                for i in range(len(sampled_indices))
-            ],
-            'active': 0,
-            'currentvalue': {
-                'prefix': 'Lap: ',
-                'font': {'color': 'white'},
-                'suffix': f' / {car_position_data["total_laps"] if car_position_data else "??"}'
-            },
-            'len': 0.9,
-            'x': 0.05,
-            'y': -0.05,
-            'yanchor': 'top'
-        }]
-    )
-    
-    # SUBPLOT STYLING
-    # Left subplot (bars)
-    fig.update_xaxes(
-        title_text='Probability (%)',
-        range=[0, 110],
-        showgrid=True,
-        gridcolor='rgba(255,255,255,0.1)',
-        tickfont=dict(color='white'),
-        row=1, col=1
-    )
-    fig.update_yaxes(
-        title_text='',
-        showgrid=False,
-        tickfont=dict(size=12, color='white'),
-        row=1, col=1
-    )
-    
-    # Right subplot (track)
-    if car_position_data:
-        fig.update_xaxes(
-            title_text='Track Position',
-            range=[-9000, 6500],
-            showgrid=False,
-            tickfont=dict(color='white'),
-            zeroline=False,
-            row=1, col=2
-        )
-        fig.update_yaxes(
-            title_text='',
-            range=[-10000, 2500],
-            showgrid=False,
-            tickfont=dict(color='white'),
-            zeroline=False,
-            row=1, col=2
-        )
-        
-        # Make track subplot properly scaled
-        fig.update_layout(
-            xaxis2=dict(scaleanchor="y2", scaleratio=1),
-        )
-
-        # Third subplot (track status) styling
-    
-    fig.update_xaxes(
-        title_text='',
-        showgrid=False,
-        showticklabels=False,
-        zeroline=False,
-        range=[0, 1],
-        row=1, col=3
-    )
-    fig.update_yaxes(
-        title_text='',
-        showgrid=False,
-        showticklabels=False,
-        zeroline=False,
-        range=[0, 1],
-        row=1, col=3
-    )
-    
-    return fig
-
-def format_track_status_text(status_info):
-    """
-    Format track status information for display
-    """
-    if not status_info:
-        return "No Data"
-    
-    # Main status with color coding
-    track_status = status_info.get('track_status', 'Green')
-    status_color = {
-        'Green': '🟢',
-        'Yellow Flag': '🟡',
-        'Safety Car': '🟠',
-        'Virtual Safety Car': '🔵',
-        'Red Flag': '🔴'
-    }.get(track_status, '⚪')
-    
-    # Weather info
-    weather_icon = '🌧️' if status_info.get('rainfall', False) else '☀️'
-    
-    # Format text
-    text_lines = [
-        f"🏁 RACE CONTROL",
-        f"{status_color} {track_status}",
-        f"Lap: {status_info.get('lap', 'N/A')}",
-        ""
-    ]
-    
-    # Add specific flag information
-    flags_active = []
-    if status_info.get('safety_car', False):
-        flags_active.append("🚗 Safety Car Deployed")
-    if status_info.get('virtual_safety_car', False):
-        flags_active.append("🔵 Virtual Safety Car")
-    if status_info.get('red_flag', False):
-        flags_active.append("🔴 RED FLAG - Session Stopped")
-    if status_info.get('yellow_flag', False):
-        flags_active.append("🟡 Yellow Flag - Caution")
-    
-    if flags_active:
-        text_lines.extend(flags_active)
-        text_lines.append("")
-    
-    # Session timing info
-    if status_info.get('session_time'):
-        session_mins = int(status_info['session_time'] // 60)
-        session_secs = int(status_info['session_time'] % 60)
-        text_lines.append(f"⏱️ Time: {session_mins:02d}:{session_secs:02d}")
-        text_lines.append("")
-    
-    # Weather section
-    text_lines.extend([
-        f"{weather_icon} WEATHER:",
-        f"Track: {status_info.get('track_temp', 'N/A'):.0f}°C" if status_info.get('track_temp') else "Track: N/A",
-        f"Air: {status_info.get('air_temp', 'N/A'):.0f}°C" if status_info.get('air_temp') else "Air: N/A",
-        f"Humidity: {status_info.get('humidity', 'N/A'):.0f}%" if status_info.get('humidity') else "Humidity: N/A"
-    ])
-    
-    # Add pressure if available
-    if status_info.get('pressure'):
-        text_lines.append(f"Pressure: {status_info['pressure']:.0f} hPa")
-    
-    # Wind section
-    text_lines.append("")
-    text_lines.append("🌪️ WIND:")
-    text_lines.append(f"Speed: {status_info.get('wind_speed', 'N/A'):.0f} km/h" if status_info.get('wind_speed') else "Speed: N/A")
-    text_lines.append(f"Direction: {status_info.get('wind_direction', 'N/A'):.0f}°" if status_info.get('wind_direction') else "Direction: N/A")
-    
-    # Rain warning
-    if status_info.get('rainfall', False):
-        text_lines.extend(["", "⚠️ RAIN DETECTED", "Track conditions may be slippery"])
-    
-    # Join with line breaks
-    return '<br>'.join(text_lines)
-
-
-
-
+    return data
 
 
 app = Flask(__name__)
-app.config['CACHE_TYPE'] = 'filesystem'
-app.config['CACHE_DIR'] = 'cache-directory'
-app.config['CACHE_DEFAULT_TIMEOUT'] = 300
 
-cache = Cache(app)
+# @app.route('/')
+# def index():
+#     print(probs_2022.shape)
 
-@cache.cached(timeout=3600, key_prefix='fastf1_session')
+#     cached_data = load_f1_session(2023, 'São Paulo', 'R')
+#     if cached_data:
+#         car_data = extract_positions_from_cache(cached_data)
 
-def get_session_data():
-    print("Loading FastF1 data...")
-    # Load FastF1 session
-    session = fastf1.get_session(2023, 'São Paulo', 'R')
-    session.load()
-
-    # Extract car position data
-    car_data = extract_full_race_car_positions(
-        session, 
-        drivers = ['VER', 'HAM', 'PER', 'ALO', 'SAI', 'RUS', 'PIA', 'STR', 'GAS', 'NOR', 'LEC', 'OCO', 'ALB', 'TSU', 'BOT', 'HUL', 'RIC', 'ZHO', 'MAG', 'DEV', 'SAR'],
-        target_timesteps=len(probs_2022)
-    )
-
-    return car_data
-
-@app.route('/')
-def index():
-    print(probs_2022.shape)
-
-    car_data = get_session_data()
-
-    fig = create_smooth_animated_bar_with_track(
-        probabilities=probs_2022,
-        car_position_data=car_data,
-        sample_every=20,      # Adjust for performance
-        animation_speed=50,   # Faster = more frames per second
-    )
+#     fig = create_smooth_animated_bar_with_track(
+#         probabilities=probs_2022,
+#         car_position_data=car_data,
+#         sample_every=2,      # Adjust for performance
+#         animation_speed=300,   # Faster = more frames per second
+#     )
     
-    graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
+#     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
     
-    test = "test var"
-    return render_template('index.html', test=test, graphJSON=graphJSON)
+#     test = "test var"
+#     return render_template('index.html', test=test, graphJSON=graphJSON)
+
+@app.route('/d3_live')
+@app.route('/d3_live/<session_id>')
+def d3_live_enhanced(session_id=None):
+    """Enhanced D3 live route with dynamic session selection"""
+    
+    # If no session_id provided, show empty state with race selector
+    if not session_id:
+        return render_template('d3_live.html', 
+                             telemetry_data='null',
+                             race_name='',
+                             race_year='',
+                             estimated_laps=71,
+                             data_quality=0,
+                             show_selector=True)
+    
+    # Get telemetry data for specific session
+    telemetry_data = fetch_live_telemetry_data(session_id)
+    
+    if not telemetry_data:
+        return "❌ Failed to load telemetry data", 500
+    
+    # Extract session metadata for display
+    metadata = telemetry_data.get('session_metadata', {})
+    
+    # Convert to JSON for frontend
+    telemetry_json = json.dumps(telemetry_data)
+    
+    # Pass metadata to template for enhanced display
+    return render_template('d3_live.html', 
+                         telemetry_data=telemetry_json,
+                         race_name=metadata.get('race_name', 'Unknown'),
+                         race_year=metadata.get('year', 'Unknown'),
+                         estimated_laps=metadata.get('estimated_laps', 71),
+                         data_quality=metadata.get('data_quality', 0),
+                         show_selector=False)
+
+@app.route('/sessions')
+def get_sessions():
+    """
+    API endpoint that returns F1 session data as JSON
+    Can optionally fetch from live API or return static data
+    """
+    # Check if we should fetch from live API
+    use_live_api = request.args.get('live', 'false').lower() == 'true'
+    
+    if use_live_api:
+        try:
+            # Try to fetch available sessions from the live API
+            api_url = "http://52.91.199.46:8088/api/v1/sessions"  # Assuming this endpoint exists
+            response = requests.get(api_url, timeout=5)
+            if response.status_code == 200:
+                live_data = response.json()
+                print("✅ Fetched sessions from live API")
+                return jsonify(live_data)
+        except (requests.RequestException, ValueError, KeyError):
+            print("⚠️ Live API unavailable, falling back to static data")
+    
+    # Static/fallback session data
+    sessions_data = {
+        "sessions": [
+            {
+                "session_id": "2024_Qatar Grand Prix_R",
+                "year": 2024,
+                "race_name": "Qatar Grand Prix",
+                "session_type": "R",
+                "session_date": "2024-12-01T15:08:45.467000+00:00",
+                "driver_count": 20,
+                "window_count": 27640
+            },
+            {
+                "session_id": "2024_São Paulo Grand Prix_R",
+                "year": 2024,
+                "race_name": "São Paulo Grand Prix",
+                "session_type": "R",
+                "session_date": "2024-11-03T14:38:04.491000+00:00",
+                "driver_count": 20,
+                "window_count": 36520
+            },
+            {
+                "session_id": "2024_Mexico City Grand Prix_R",
+                "year": 2024,
+                "race_name": "Mexico City Grand Prix",
+                "session_type": "R",
+                "session_date": "2024-10-27T19:07:35.354000+00:00",
+                "driver_count": 20,
+                "window_count": 29000
+            },
+            {
+                "session_id": "2024_United States Grand Prix_R",
+                "year": 2024,
+                "race_name": "United States Grand Prix",
+                "session_type": "R",
+                "session_date": "2024-10-20T18:06:39.923000+00:00",
+                "driver_count": 20,
+                "window_count": 28540
+            },
+            {
+                "session_id": "2024_Monaco Grand Prix_R",
+                "year": 2024,
+                "race_name": "Monaco Grand Prix",
+                "session_type": "R",
+                "session_date": "2024-05-26T12:08:08.143000+00:00",
+                "driver_count": 20,
+                "window_count": 36640
+            },
+            {
+                "session_id": "2024_Miami Grand Prix_R",
+                "year": 2024,
+                "race_name": "Miami Grand Prix",
+                "session_type": "R",
+                "session_date": "2024-05-05T19:07:43.944000+00:00",
+                "driver_count": 20,
+                "window_count": 27280
+            },
+            {
+                "session_id": "2024_Chinese Grand Prix_R",
+                "year": 2024,
+                "race_name": "Chinese Grand Prix",
+                "session_type": "R",
+                "session_date": "2024-04-21T06:08:20.009000+00:00",
+                "driver_count": 20,
+                "window_count": 29580
+            },
+            {
+                "session_id": "2024_Saudi Arabian Grand Prix_R",
+                "year": 2024,
+                "race_name": "Saudi Arabian Grand Prix",
+                "session_type": "R",
+                "session_date": "2024-03-09T16:04:17.905000+00:00",
+                "driver_count": 20,
+                "window_count": 26420
+            }
+        ]
+    }
+    
+    return jsonify(sessions_data)
+
+if __name__ == '__main__':
+
+    app.run(debug=True, port=5001)
