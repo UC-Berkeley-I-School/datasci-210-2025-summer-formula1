@@ -76,6 +76,9 @@ DB_CONFIG = {
     'password': os.environ.get('POSTGRES_PASSWORD') or os.environ.get('DB_PASSWORD', 'f1_password'),
 }
 
+# Debug logging to verify configuration
+print(f"Database configuration: host={DB_CONFIG['host']}, port={DB_CONFIG['port']}, database={DB_CONFIG['database']}, user={DB_CONFIG['user']}")
+
 # Instantiate a single DAO instance. Reusing the same DAO avoids
 # re-establishing a new connection for every request, which can be
 # expensive. Psycopg2 will pool connections internally when used
@@ -154,7 +157,7 @@ def predict(request: PredictRequest) -> PredictResponse:
                 metadata = {}
 
         # Determine which model directory corresponds to this driver
-        models_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../models'))
+        models_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../models'))
         model_dir = None
         model_id = None
         for d in os.listdir(models_root):
