@@ -1,13 +1,25 @@
 [project]
 name = "model-service"
 version = "0.1.0"
-description = "Add your description here"
+description = "A REST API for serving model predictions and race telemtry"
 readme = "README.md"
 authors = [
     { name = "Sean Sica", email = "23294618+seansica@users.noreply.github.com" }
 ]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "aeon>=0.0.0",
+    "fastapi>=0.116.1",
+    "joblib>=1.5.1",
+    "numpy>=2.3.2",
+    "pandas>=2.3.1",
+    "psycopg2-binary>=2.9.10",
+    "pydantic>=2.11.7",
+    "python-dotenv>=1.1.1",
+    "redis>=6.2.0",
+    "scikit-learn>=1.7.1",
+    "uvicorn[standard]>=0.35.0",
+]
 
 [project.scripts]
 model-service = "model_service:main"
