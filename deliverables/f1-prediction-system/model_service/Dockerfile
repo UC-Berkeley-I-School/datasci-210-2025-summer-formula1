@@ -1,5 +1,8 @@
 FROM python:3.12-slim
 
+# Install git for installing packages from GitHub
+RUN apt-get update && apt-get install -y git && rm -rf /var/lib/apt/lists/*
+
 # Set working directory for the application
 WORKDIR /app
 
