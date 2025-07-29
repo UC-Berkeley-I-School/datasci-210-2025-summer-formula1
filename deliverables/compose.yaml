@@ -1,0 +1,67 @@
+version: '3.8'
+
+# Centralised Docker Compose configuration for the Formula 1 Safety Car Prediction System.
+# This compose file defines the three core services used by the application:
+#   1. db – TimescaleDB built from our custom f1-timescaledb image
+#   2. model_service – FastAPI service for model inference
+#   3. webapp – Flask-based frontend UI
+# All services share a bridge network for inter-container communication.
+
+services:
+  db:
+    image: f1-timescaledb:latest
+    container_name: f1_db
+    build:
+      context: ./f1-prediction-system/database
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_DB: f1_telemetry
+      POSTGRES_USER: f1_user
+      POSTGRES_PASSWORD: f1_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - f1_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U f1_user -d f1_telemetry"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  model_service:
+    container_name: f1_model_service
+    build:
+      context: ./f1-prediction-system/model_service
+      dockerfile: Dockerfile
+    environment:
+      POSTGRES_DB: f1_telemetry
+      POSTGRES_USER: f1_user
+      POSTGRES_PASSWORD: f1_password
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./f1-prediction-system/models:/app/models
+
+  webapp:
+    container_name: f1_webapp
+    build:
+      context: ./f1-prediction-system/webapp
+      dockerfile: Dockerfile # TODO write this
+    ports:
+      - "5000:5000"
+    environment:
+      API_BASE_URL: http://model_service:8000
+    depends_on:
+      - model_service
+
+volumes:
+  f1_data:
+
+networks:
+  default:
+    driver: bridge
