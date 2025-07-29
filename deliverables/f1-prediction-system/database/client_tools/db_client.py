@@ -128,7 +128,7 @@ class F1TimescaleDAO:
                 array_agg(w.start_time ORDER BY w.window_index) as start_times,
                 array_agg(w.prediction_time ORDER BY w.window_index) as prediction_times,
                 MAX(w.sequence_length) as n_timesteps,
-                array_length(MAX(w.features_used), 1) as n_features,
+                MAX(array_length(w.features_used,1)) as n_features,
                 MAX(w.features_used) as feature_names
             FROM time_series_windows w
             JOIN window_features f ON 
