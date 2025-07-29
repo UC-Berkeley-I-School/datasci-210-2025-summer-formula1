@@ -37,9 +37,9 @@ NORMALIZE = True  # Whether to normalize features
 
 # Database connection (uses environment variables by default)
 DB_CONFIG = {
-    "host": "127.0.0.1",
+    "host": "localhost",
     "port": 5432,
-    "database": "racing_telemetry",
-    "user": "racing_user",
-    "password": "racing_password"
+    "database": "f1_telemetry",
+    "user": "f1_user",
+    "password": "f1_password"
 }
