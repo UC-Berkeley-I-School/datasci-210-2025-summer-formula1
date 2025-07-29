@@ -136,6 +136,10 @@ def predict(request: PredictRequest) -> PredictResponse:
     features_by_driver = features.get('features_by_driver', {})
     predictions: List[DriverPrediction] = []
     import json
+    
+    # Get models root directory once
+    models_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../models'))
+    
     for driver_number, driver_data in features_by_driver.items():
         # Unpack driver_data (dict-based from db_client)
         X = driver_data.get('X')
@@ -157,7 +161,6 @@ def predict(request: PredictRequest) -> PredictResponse:
                 metadata = {}
 
         # Determine which model directory corresponds to this driver
-        models_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '../models'))
         model_dir = None
         model_id = None
         for d in os.listdir(models_root):
@@ -168,10 +171,9 @@ def predict(request: PredictRequest) -> PredictResponse:
 
         y_pred: List[int] = []
         y_proba: List[List[float]] = []
-        if model_dir:
+        if model_id:
             try:
-                # Use subdirectory name as model_id for ModelManager
-                model_id = os.path.basename(model_dir)
+                # Use model_id for ModelManager
                 model = model_manager.get_model(model_id)
                 # Run prediction
                 y_pred = model.predict(X).tolist()
@@ -182,6 +184,8 @@ def predict(request: PredictRequest) -> PredictResponse:
                 logging.error(f"Model loading/prediction error for driver {driver_number}: {e}")
                 y_pred = []
                 y_proba = []
+        else:
+            logging.warning(f"No model found for driver {driver_number}")
 
         # Build prediction schema
         predictions.append(
