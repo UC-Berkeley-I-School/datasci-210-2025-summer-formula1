@@ -69,12 +69,15 @@ if [ -d "certbot/conf/live/$DOMAIN" ]; then
     fi
 fi
 
-# For renewals, nginx is already running with proper config
-print_info "Preparing for certificate generation..."
+# Check if this is initial setup or renewal
 if [ -d "certbot/conf/live/$DOMAIN" ]; then
-    print_info "Renewing existing certificates..."
+    print_info "Renewing existing certificates - using production nginx..."
+    # For renewals, production nginx is already running with ACME challenge support
 else
-    print_info "Generating initial certificates..."
+    print_info "Initial certificate generation - starting bootstrap nginx..."
+    # For initial setup, start bootstrap nginx that doesn't require SSL certs
+    docker compose -f compose.bootstrap.yaml up -d nginx_bootstrap
+    sleep 5
 fi
 
 # Determine staging flag
@@ -116,8 +119,15 @@ if [ $? -eq 0 ]; then
             -subj "/C=US/ST=State/L=City/O=Organization/CN=$DOMAIN"
     fi
     
-    print_info "Restarting nginx to use new certificates..."
-    docker compose -f compose.prod.yaml restart nginx
+    # Stop bootstrap nginx if it was used for initial setup
+    if [ ! -f "certbot/conf/live/$DOMAIN/fullchain.pem.bak" ]; then
+        print_info "Stopping bootstrap nginx and starting production services..."
+        docker compose -f compose.bootstrap.yaml down 2>/dev/null || true
+        docker compose -f compose.prod.yaml up -d
+    else
+        print_info "Restarting nginx to use renewed certificates..."
+        docker compose -f compose.prod.yaml restart nginx
+    fi
     
     print_info "SSL setup complete!"
     print_info "Your application should now be accessible at:"
@@ -132,6 +142,8 @@ if [ $? -eq 0 ]; then
 else
     print_error "Failed to obtain SSL certificate"
     print_error "Please check your domain DNS settings and try again"
+    # Clean up bootstrap nginx if it was started
+    docker compose -f compose.bootstrap.yaml down 2>/dev/null || true
     exit 1
 fi
 

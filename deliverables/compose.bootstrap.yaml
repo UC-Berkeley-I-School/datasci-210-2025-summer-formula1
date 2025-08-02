@@ -1,0 +1,21 @@
+services:
+  # Nginx bootstrap for SSL certificate generation
+  nginx_bootstrap:
+    container_name: f1_nginx_bootstrap
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    ports:
+      - "80:80"
+    volumes:
+      # Let's Encrypt challenge directory
+      - ./certbot/www:/var/www/certbot
+      # Bootstrap nginx config (HTTP only)
+      - ./nginx/nginx-bootstrap.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: "no"
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge
