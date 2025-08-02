@@ -5,9 +5,13 @@ meta {
 }
 
 get {
-  url: {{host}}/api/v1/telemetry
-  body: json
+  url: {{host}}/api/v1/telemetry?session_id=2024_São Paulo Grand Prix_R
+  body: none
   auth: inherit
+}
+
+params:query {
+  session_id: 2024_São Paulo Grand Prix_R
 }
 
 headers {
