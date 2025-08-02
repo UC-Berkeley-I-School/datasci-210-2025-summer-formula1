@@ -1,0 +1,126 @@
+# F1 Prediction System Web Application - Development Commands
+
+# Default command - show available commands
+default:
+    @just --list
+
+# Install dependencies using uv
+install:
+    uv sync
+    uv pip install -e .
+
+# Install with dev dependencies
+install-dev:
+    uv sync
+    uv pip install -e ".[dev]"
+
+# Run Flask in development mode with hot-reload
+dev:
+    #!/usr/bin/env bash
+    export FLASK_APP=src/webapp/f1dev.py
+    export FLASK_ENV=development
+    export FLASK_DEBUG=1
+    uv run flask run --host=0.0.0.0 --port=5001 --reload
+
+# Run Flask with watchdog for better hot-reload
+dev-watch:
+    #!/usr/bin/env bash
+    export FLASK_APP=src/webapp/f1dev.py
+    export FLASK_ENV=development
+    export FLASK_DEBUG=1
+    uv run watchmedo auto-restart \
+        --directory=./src \
+        --pattern="*.py;*.html;*.css;*.js" \
+        --recursive \
+        -- flask run --host=0.0.0.0 --port=5001
+
+# Run production server with gunicorn
+prod:
+    uv run gunicorn \
+        --bind 0.0.0.0:8000 \
+        --workers 4 \
+        --worker-class sync \
+        --timeout 120 \
+        --log-level info \
+        "src.webapp.f1dev:app"
+
+# Run tests
+test:
+    uv run pytest
+
+# Run tests with coverage
+test-cov:
+    uv run pytest --cov=src/webapp --cov-report=html --cov-report=term
+
+# A simple script to examine the npy file. Shows structure of the data.
+examine-npy:
+    uv run examine_npy.py
+
+# Format code with black
+format:
+    uv run black src/
+
+# Lint code with ruff
+lint:
+    uv run ruff check src/
+
+# Fix lint issues automatically
+lint-fix:
+    uv run ruff check --fix src/
+
+# Type check with mypy
+typecheck:
+    uv run mypy src/
+
+# Run all quality checks
+check: lint typecheck test
+
+# Clean up cache and temporary files
+clean:
+    find . -type d -name "__pycache__" -exec rm -rf {} +
+    find . -type f -name "*.pyc" -delete
+    find . -type f -name "*.pyo" -delete
+    find . -type d -name ".pytest_cache" -exec rm -rf {} +
+    find . -type d -name ".mypy_cache" -exec rm -rf {} +
+    find . -type d -name "htmlcov" -exec rm -rf {} +
+    find . -type d -name ".coverage" -exec rm -rf {} +
+
+# Build Docker image
+docker-build:
+    docker build -t f1-webapp .
+
+# Run Docker container
+docker-run:
+    docker run -p 5001:5001 --env-file .env f1-webapp
+
+# Run with docker-compose (from parent directory)
+compose-up:
+    cd ../../.. && docker-compose -f deliverables/compose.yaml up webapp
+
+# Stop docker-compose services
+compose-down:
+    cd ../../.. && docker-compose -f deliverables/compose.yaml down
+
+# View logs
+logs:
+    tail -f logs/*.log
+
+# Create logs directory if it doesn't exist
+init-logs:
+    mkdir -p logs
+
+# Environment setup helper
+setup-env:
+    #!/usr/bin/env bash
+    if [ ! -f .env ]; then
+        echo "Creating .env file from template..."
+        cp .env.example .env
+        echo ".env file created. Please update with your configuration."
+    else
+        echo ".env file already exists."
+    fi
+
+# Initialize development environment
+init: install-dev setup-env init-logs
+    @echo "Development environment initialized!"
+    @echo "Run 'just dev' to start the Flask server in hot-reload mode"

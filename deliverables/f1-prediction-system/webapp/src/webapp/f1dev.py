@@ -1,23 +1,43 @@
 from flask import Flask, render_template, request, jsonify
 from flask_caching import Cache
+from dotenv import load_dotenv
 
 import numpy as np
 import pandas as pd
 
 import json
 import requests
+import os
+import logging
 
-import fastf1
-from fastf1 import get_session
-fastf1.Cache.enable_cache(r'E:\School Stuff\F1cache')
+# Load environment variables from .env file
+load_dotenv()
 
-probs_2022 = np.load('2022probs.npy')
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# FastF1 is not needed - all telemetry data comes from the REST API
+
+# Load probabilities file if it exists
+try:
+    # Get the directory where this script is located
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    probs_file = os.path.join(script_dir, '2022probs.npy')
+    probs_2022 = np.load(probs_file)
+    print(f"✅ Loaded probabilities from {probs_file}")
+except FileNotFoundError:
+    print("Warning: 2022probs.npy not found, using random data")
+    probs_2022 = np.random.rand(100)  # Placeholder data
 
 def get_available_sessions():
     """Fetch all available sessions from the API"""
+    api_base_url = os.environ.get('API_BASE_URL', 'http://f1_model_service:8000')
+    sessions_url = f"{api_base_url}/api/v1/sessions"
     try:
-        print("🌐 Attempting to fetch sessions from live API...")
-        response = requests.get("http://52.91.199.46:8088/api/v1/sessions", timeout=10)
+        print(f"🌐 Attempting to fetch sessions from: {sessions_url}")
+        logger.info(f"API_BASE_URL environment variable: {os.environ.get('API_BASE_URL', 'Not set')}")
+        response = requests.get(sessions_url, timeout=10)
         response.raise_for_status()
         
         data = response.json()
@@ -47,11 +67,15 @@ def get_available_sessions():
         print(f"❌ Error fetching sessions from live API: {e}")
         return []
 
-def fetch_live_telemetry_data(session_id=None, api_base_url="http://52.91.199.46:8088/api/v1"):
+def fetch_live_telemetry_data(session_id=None, api_base_url=None):
     """
     Fetch live telemetry data from external API and convert to D3 visualization format
     ENHANCED: Requires explicit session_id, no auto-selection
     """
+    
+    # Use environment variable if api_base_url not provided
+    if api_base_url is None:
+        api_base_url = os.environ.get('API_BASE_URL', 'http://f1_model_service:8000')
     
     # If no session_id provided, return None (no auto-selection)
     if not session_id:
@@ -74,7 +98,7 @@ def fetch_live_telemetry_data(session_id=None, api_base_url="http://52.91.199.46
     
     try:
         # Construct API URL
-        api_url = f"{api_base_url}/telemetry?session_id={session_id}"
+        api_url = f"{api_base_url}/api/v1/telemetry?session_id={session_id}"
         
         # Make API request
         response = requests.get(api_url, timeout=10)
@@ -307,81 +331,20 @@ def fetch_live_telemetry_data(session_id=None, api_base_url="http://52.91.199.46
         print(f"❌ Error processing API data: {e}")
         return None
 
-def load_d3_visualization_data(year, gp, session_type='R', cache_dir='f1_cache'):
-    """
-    Load pre-processed D3 visualization data from JSON (INSTANT!)
-    """
-    cache_path = Path(cache_dir)
-    json_filename = f"{year}_{gp.replace(' ', '_')}_{session_type}_d3.json"
-    json_filepath = cache_path / json_filename
-    
-    if not json_filepath.exists():
-        print(f"❌ No D3 data found for {year} {gp} {session_type}")
-        print(f"Run create_d3_data.py to generate the data first!")
-        return None
-    
-    print(f"⚡ Loading {json_filename} from cache...")
-    start_time = time.time()
-    
-    with open(json_filepath, 'r', encoding='utf-8') as f:
-        data = json.load(f)
-    
-    load_time = time.time() - start_time
-    file_size = json_filepath.stat().st_size / (1024*1024)  # MB
-    
-    print(f"✅ D3 data loaded in {load_time:.3f}s ({file_size:.1f} MB)")
-    print(f"  📊 {len(data['probabilities']):,} probabilities")
-    print(f"  🏎️ {len(data['drivers'])} drivers")
-    print(f"  🎯 {data['totalTimesteps']:,} timesteps")
-    
-    return data
-
-def load_f1_session(year, gp, session_type='R', cache_dir='f1_cache'):
-    """
-    Load FastF1 session data from cache (FAST!)
-    """
-    cache_path = Path(cache_dir)
-    filename = f"{year}_{gp.replace(' ', '_')}_{session_type}.pkl.gz"
-    filepath = cache_path / filename
-    
-    if not filepath.exists():
-        print(f"❌ No cache found for {year} {gp} {session_type}")
-        print(f"Run save_f1_session({year}, '{gp}', '{session_type}') first!")
-        return None
-    
-    print(f"⚡ Loading {filename} from cache...")
-    start_time = time.time()
-    
-    with gzip.open(filepath, 'rb') as f:
-        data = pickle.load(f)
-    
-    load_time = time.time() - start_time
-    print(f"✅ Loaded in {load_time:.2f}s!")
-    
-    return data
+# Removed unused FastF1-related functions - all data comes from REST API
 
 
+logger.info("Creating Flask app...")
 app = Flask(__name__)
+logger.info("Flask app created successfully")
 
-# @app.route('/')
-# def index():
-#     print(probs_2022.shape)
+@app.route('/')
+def index():
+    """Root route - redirect to the main visualization"""
+    from flask import redirect, url_for
+    return redirect(url_for('d3_live_enhanced'))
 
-#     cached_data = load_f1_session(2023, 'São Paulo', 'R')
-#     if cached_data:
-#         car_data = extract_positions_from_cache(cached_data)
-
-#     fig = create_smooth_animated_bar_with_track(
-#         probabilities=probs_2022,
-#         car_position_data=car_data,
-#         sample_every=2,      # Adjust for performance
-#         animation_speed=300,   # Faster = more frames per second
-#     )
-    
-#     graphJSON = json.dumps(fig, cls=plotly.utils.PlotlyJSONEncoder)
-    
-#     test = "test var"
-#     return render_template('index.html', test=test, graphJSON=graphJSON)
+# Old route removed - using d3_live instead
 
 @app.route('/d3_live')
 @app.route('/d3_live/<session_id>')
@@ -425,13 +388,25 @@ def get_sessions():
     API endpoint that returns F1 session data as JSON
     Can optionally fetch from live API or return static data
     """
-    # Check if we should fetch from live API
+    logger.info("📍 /sessions endpoint called")
+    
+    # Try to get sessions from the live API first
+    sessions = get_available_sessions()
+    if sessions:
+        logger.info(f"✅ Found {len(sessions)} sessions from live API")
+        return jsonify({"sessions": sessions})
+    
+    # Fall back to static data if API is unavailable
+    logger.info("⚠️ Falling back to static session data")
+    
+    # Check if we should fetch from live API (legacy parameter)
     use_live_api = request.args.get('live', 'false').lower() == 'true'
     
     if use_live_api:
         try:
             # Try to fetch available sessions from the live API
-            api_url = "http://52.91.199.46:8088/api/v1/sessions"  # Assuming this endpoint exists
+            api_base_url = os.environ.get('API_BASE_URL', 'http://f1_model_service:8000')
+            api_url = f"{api_base_url}/api/v1/sessions"
             response = requests.get(api_url, timeout=5)
             if response.status_code == 200:
                 live_data = response.json()

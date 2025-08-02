@@ -532,7 +532,7 @@
         async function fetchAvailableSessions() {
             console.log('🌐 Fetching available sessions...');
             try {
-                const response = await fetch('/api/sessions');
+                const response = await fetch('/sessions');
                 console.log('📡 Response received:', response.status, response.statusText);
                 
                 if (!response.ok) {

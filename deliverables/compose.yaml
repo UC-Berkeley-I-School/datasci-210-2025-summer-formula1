@@ -51,11 +51,11 @@ services:
     container_name: f1_webapp
     build:
       context: ./f1-prediction-system/webapp
-      dockerfile: Dockerfile # TODO write this
+      dockerfile: Dockerfile
     ports:
       - "5000:5000"
     environment:
-      API_BASE_URL: http://model_service:8000
+      API_BASE_URL: http://f1_model_service:8000
     depends_on:
       - model_service
 
