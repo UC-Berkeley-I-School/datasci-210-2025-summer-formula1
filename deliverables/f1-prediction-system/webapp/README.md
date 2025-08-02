@@ -147,6 +147,68 @@ The webapp connects to the F1 Model Service REST API to fetch:
 
 The API base URL is configured via the `API_BASE_URL` environment variable.
 
+## Logging Configuration
+
+The application supports configurable logging levels for both the Flask app and Gunicorn server.
+
+### Available Log Levels
+
+- **DEBUG**: Shows all logs including request/response details, API calls, and data validation
+- **INFO**: Shows important operations and state changes (default)
+- **WARNING**: Shows only warnings and errors
+- **ERROR**: Shows only errors and exceptions
+- **CRITICAL**: Shows only critical failures
+
+### Setting Log Levels
+
+**For local development:**
+Edit your `.env` file:
+```bash
+LOG_LEVEL=DEBUG              # Flask app logging
+GUNICORN_LOG_LEVEL=INFO     # Gunicorn server logging
+```
+
+**For Docker deployment:**
+Set environment variables in docker-compose.yaml:
+```yaml
+webapp:
+  environment:
+    LOG_LEVEL: DEBUG
+    GUNICORN_LOG_LEVEL: INFO
+```
+
+Or when running Docker directly:
+```bash
+docker run -e LOG_LEVEL=DEBUG -e GUNICORN_LOG_LEVEL=INFO ...
+```
+
+### Viewing Logs
+
+**Local development:**
+```bash
+just dev  # Logs appear in terminal
+```
+
+**Docker deployment:**
+```bash
+# View all logs
+docker compose logs webapp
+
+# Follow logs in real-time
+docker compose logs -f webapp
+
+# View last 100 lines
+docker compose logs --tail=100 webapp
+```
+
+### Log Format
+
+Logs are formatted with timestamp, logger name, level, and message:
+```
+2025-08-02 18:30:45 - f1dev - INFO - Flask app created successfully
+2025-08-02 18:30:46 - f1dev - DEBUG - Request: GET /sessions - From: 172.17.0.1
+```
+
 ## Troubleshooting
 
 ### Connection Issues

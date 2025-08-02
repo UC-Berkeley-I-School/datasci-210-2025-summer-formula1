@@ -1,4 +1,6 @@
-FROM python:3.12-slim
+# Build arguments (can be overridden during build)
+ARG PYTHON_VERSION=3.12
+FROM python:${PYTHON_VERSION}-slim
 
 # Set working directory
 WORKDIR /app
@@ -15,17 +17,33 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the application code
 COPY src/webapp /app
 
-# Create a cache directory for fastf1
-RUN mkdir -p /app/cache
-
-# Set environment variables
+# Set default environment variables for runtime
+# These can be overridden by docker-compose or docker run -e
 ENV FLASK_APP=f1dev.py
+ENV FLASK_ENV=production
+ENV FLASK_DEBUG=0
 ENV PYTHONPATH=/app
-ENV FASTF1_CACHE=/app/cache
+
+# Default API configuration - should be overridden at runtime
+ENV API_BASE_URL=http://f1_model_service:8000
+
+# Server configuration
+ENV HOST=0.0.0.0
+ENV PORT=5000
+
+# Logging configuration
+# Valid levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+ENV LOG_LEVEL=INFO
+ENV GUNICORN_LOG_LEVEL=INFO
+
+# Cache configuration
+ENV CACHE_TYPE=simple
+ENV CACHE_DEFAULT_TIMEOUT=300
 
 # Expose the port the app runs on
 EXPOSE 5000
 
 # Run the application with gunicorn for production
-# Increase timeout to handle slow startup and set preload to share memory between workers
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--timeout", "120", "--preload", "f1dev:app"]
+# Using shell form to allow environment variable expansion
+# Removed --preload to avoid timeout issues during initialization
+CMD gunicorn --bind 0.0.0.0:5000 --workers 4 --timeout 300 --log-level ${GUNICORN_LOG_LEVEL} f1dev:app

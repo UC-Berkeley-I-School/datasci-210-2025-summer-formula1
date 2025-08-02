@@ -56,6 +56,8 @@ services:
       - "5000:5000"
     environment:
       API_BASE_URL: http://f1_model_service:8000
+      LOG_LEVEL: INFO  # Set to DEBUG for detailed logging
+      GUNICORN_LOG_LEVEL: INFO
     depends_on:
       - model_service
 
