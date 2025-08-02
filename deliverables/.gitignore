@@ -1,0 +1,21 @@
+# SSL certificates and private keys
+certbot/
+
+# Environment-specific files
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo

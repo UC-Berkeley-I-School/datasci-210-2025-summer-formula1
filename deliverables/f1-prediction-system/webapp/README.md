@@ -114,14 +114,22 @@ docker compose build webapp
 
 ### Running with Docker Compose
 
+**Development (HTTP):**
 ```bash
 docker compose up webapp -d
+```
+
+**Production (HTTPS):**
+```bash
+# See ../../HTTPS_SETUP.md for full setup guide
+cd ../..
+sudo ./setup-ssl.sh your-domain.com your-email@example.com
 ```
 
 This will:
 - Build the webapp container
 - Start the webapp along with its dependencies (model_service, database)
-- Expose the webapp on port 5000
+- Expose the webapp on port 5000 (dev) or 443 (production)
 
 ### Using Just commands for Docker:
 
