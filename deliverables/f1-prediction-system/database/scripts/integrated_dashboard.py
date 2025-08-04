@@ -22,6 +22,7 @@ from dataclasses import dataclass
 from enum import Enum
 import json
 import random
+import copy
 
 # Safety Car Prediction Classes
 class IncidentType(Enum):
@@ -54,13 +55,24 @@ class TrackIncidentProfile:
 
 class F1IncidentPredictor:
     def __init__(self):
-        self.track_profiles = self._initialize_track_profiles()
+        # 1) load just our hand-tuned profiles
+        self.track_profiles = self._initialize_track_profiles(static_only=True)
+        # 2) pull every race_name from sessions, strip “ Grand Prix”
+        api = F1DatabaseAPI()
+        df = api.execute_query("SELECT DISTINCT race_name FROM sessions")
+        if "race_name" in df.columns:
+            db_tracks = (
+                df["race_name"]
+                .str.replace(r"\s+Grand Prix$", "", regex=True)
+                .tolist()
+            )
+        else:
+            db_tracks = []
         self.driver_risk_factors = self._initialize_driver_profiles()
-        
-    def _initialize_track_profiles(self) -> Dict[str, TrackIncidentProfile]:
-        """Initialize incident probability profiles for F1 tracks"""
-        profiles = {}
-        
+
+
+    def _initialize_track_profiles(self, static_only: bool = False) -> Dict[str, TrackIncidentProfile]:
+        profiles: Dict[str, TrackIncidentProfile] = {}
         # Street Circuits - Higher incident probability
         profiles['Monaco'] = TrackIncidentProfile(
             track_name='Monaco',
@@ -123,23 +135,92 @@ class F1IncidentPredictor:
             track_type='permanent'
         )
         
-        # Add more tracks with default values
-        default_tracks = ['Sakhir', 'Jeddah', 'Melbourne', 'Imola', 'Montréal', 
-                         'Barcelona', 'Budapest', 'Zandvoort', 'Mexico City', 
-                         'Las Vegas', 'Yas Island', 'Austin', 'Interlagos', 'Suzuka']
+        # Street Circuits – Higher incident probability
+        profiles['Monaco'] = TrackIncidentProfile(
+            track_name='Monaco',
+            base_vsc_probability=0.025,
+            base_sc_probability=0.015,
+            base_red_flag_probability=0.003,
+            incident_prone_sections=['Nouvelle Chicane', 'Rascasse', 'Sainte Devote'],
+            weather_sensitivity=2.5,
+            track_type='street'
+        )
+
+        profiles['Miami'] = TrackIncidentProfile(
+            track_name='Miami',
+            base_vsc_probability=0.020,
+            base_sc_probability=0.012,
+            base_red_flag_probability=0.002,
+            incident_prone_sections=['Turn 1', 'Turn 11', 'Turn 17'],
+            weather_sensitivity=1.8,
+            track_type='street'
+        )
+
+        profiles['Jeddah'] = TrackIncidentProfile(
+            track_name='Jeddah',
+            base_vsc_probability=0.028,
+            base_sc_probability=0.020,
+            base_red_flag_probability=0.003,
+            incident_prone_sections=['Turn 2', 'Turn 10', 'Turn 27'],
+            weather_sensitivity=2.0,
+            track_type='street'
+        )
+
+        # Permanent Circuits – Lower incident probability
+        profiles['Qatar'] = TrackIncidentProfile(
+            track_name='Qatar',
+            base_vsc_probability=0.010,
+            base_sc_probability=0.006,
+            base_red_flag_probability=0.001,
+            incident_prone_sections=['Turn 1', 'Turn 6', 'Turn 10'],
+            weather_sensitivity=1.3,
+            track_type='permanent'
+        )
+
+        profiles['São Paulo'] = TrackIncidentProfile(
+            track_name='São Paulo',
+            base_vsc_probability=0.015,
+            base_sc_probability=0.009,
+            base_red_flag_probability=0.0015,
+            incident_prone_sections=['Turn 1', 'Turn 4', 'Turn 12'],
+            weather_sensitivity=2.2,
+            track_type='permanent'
+        )
+
+        profiles['Mexico City'] = TrackIncidentProfile(
+            track_name='Mexico City',
+            base_vsc_probability=0.018,
+            base_sc_probability=0.010,
+            base_red_flag_probability=0.002,
+            incident_prone_sections=['Peraltada', 'Turn 4', 'Turn 11'],
+            weather_sensitivity=1.7,
+            track_type='permanent'
+        )
+
+        profiles['Circuit of the Americas'] = TrackIncidentProfile(
+            track_name='Circuit of the Americas',
+            base_vsc_probability=0.012,
+            base_sc_probability=0.007,
+            base_red_flag_probability=0.001,
+            incident_prone_sections=['Turn 1', 'Turn 12', 'Turn 20'],
+            weather_sensitivity=1.5,
+            track_type='permanent'
+        )
+
+        profiles['Shanghai'] = TrackIncidentProfile(
+            track_name='Shanghai',
+            base_vsc_probability=0.010,
+            base_sc_probability=0.006,
+            base_red_flag_probability=0.001,
+            incident_prone_sections=['Turn 1', 'Turn 13', 'Turn 14'],
+            weather_sensitivity=1.4,
+            track_type='permanent'
+        )        
         
-        for track in default_tracks:
-            profiles[track] = TrackIncidentProfile(
-                track_name=track,
-                base_vsc_probability=0.012,
-                base_sc_probability=0.007,
-                base_red_flag_probability=0.0015,
-                incident_prone_sections=['Turn 1', 'Final Corner'],
-                weather_sensitivity=1.5,
-                track_type='permanent'
-            )
-        
+        if static_only:
+            return profiles
         return profiles
+
     
     def _initialize_driver_profiles(self) -> Dict[str, float]:
         """Initialize driver risk factors for all 20 drivers on the 2024 grid"""
@@ -445,8 +526,11 @@ class F1DatabaseAPI:
         """Execute query and return DataFrame"""
         try:
             if self.db_type == 'remote':
-                # For remote API, we'll implement specific endpoint calls
-                return pd.DataFrame()
+                # actually fetch sessions from your remote API
+                resp = requests.get(f"{self.remote_base}/api/v1/sessions", timeout=10)
+                resp.raise_for_status()
+                sessions = resp.json().get("sessions", [])
+                return pd.DataFrame(sessions)
             else:
                 conn = psycopg2.connect(**self.db_config)
                 df = pd.read_sql_query(query, conn, params=params)
@@ -1105,24 +1189,24 @@ async def serve_monte_carlo():
                     <div class="control-card">
                         <h3>Track & Simulation Parameters</h3>
                         <div class="input-group">
-                            <label>Track</label>
-                            <select id="driverTrackSelect">
-                                <option value="Silverstone" selected>Silverstone (UK)</option>
-                                <option value="Monaco">Monaco (Street)</option>
-                                <option value="Monza">Monza (Italy)</option>
-                                <option value="Spa">Spa-Francorchamps (Belgium)</option>
-                                <option value="Suzuka">Suzuka (Japan)</option>
-                                <option value="Interlagos">Interlagos (Brazil)</option>
-                                <option value="Austin">Circuit of the Americas (USA)</option>
-                                <option value="Zandvoort">Zandvoort (Netherlands)</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
                             <label>Number of Simulations</label>
                             <select id="numDriverSimulations">
                                 <option value="1000">1,000 runs</option>
                                 <option value="5000" selected>5,000 runs</option>
                                 <option value="10000">10,000 runs</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>Track</label>
+                            <select id="driverTrackSelect">
+                                <option value="Qatar">Qatar (Permanent)</option>
+                                <option value="São Paulo">São Paulo (Permanent)</option>
+                                <option value="Mexico City">Mexico City (Permanent)</option>
+                                <option value="Circuit of the Americas">United States (COTA)</option>
+                                <option value="Monaco">Monaco (Street)</option>
+                                <option value="Miami">Miami (Street)</option>
+                                <option value="Shanghai">Shanghai (China)</option>
+                                <option value="Jeddah">Jeddah (Saudi Arabia)</option>
                             </select>
                         </div>
                         <div class="input-group">
@@ -1201,14 +1285,14 @@ async def serve_monte_carlo():
                         <div class="input-group">
                             <label>Track</label>
                             <select id="trackSelect">
+                                <option value="Qatar">Qatar (Permanent)</option>
+                                <option value="São Paulo">São Paulo (Permanent)</option>
+                                <option value="Mexico City">Mexico City (Permanent)</option>
+                                <option value="Circuit of the Americas">United States (COTA)</option>
                                 <option value="Monaco">Monaco (Street)</option>
-                                <option value="Baku">Baku (Street)</option>
-                                <option value="Marina Bay">Marina Bay (Street)</option>
-                                <option value="Silverstone">Silverstone (Permanent)</option>
-                                <option value="Spa">Spa-Francorchamps (Permanent)</option>
-                                <option value="Monza" selected>Monza (Permanent)</option>
-                                <option value="Suzuka">Suzuka (Permanent)</option>
-                                <option value="Interlagos">Interlagos (Permanent)</option>
+                                <option value="Miami">Miami (Street)</option>
+                                <option value="Shanghai">Shanghai (China, Permanent)</option>
+                                <option value="Jeddah">Jeddah (Saudi Arabia, Street)</option>
                             </select>
                         </div>
                         <div class="input-group">
@@ -1618,7 +1702,7 @@ async def serve_monte_carlo():
                 const container = document.getElementById('trackAnalysisChart');
                 
                 // Determine track type
-                const streetTracks = ['Monaco', 'Baku', 'Marina Bay'];
+                const streetTracks = ['Monaco','Miami','Jeddah','Baku','Marina Bay'];
                 const trackType = streetTracks.includes(track) ? 'Street Circuit' : 'Permanent Circuit';
                 
                 container.innerHTML = `
@@ -1681,6 +1765,29 @@ async def serve_monte_carlo():
                 `).join('');
             }
 
+            
+            async function populateTrackSelects() {
+                const res = await fetch(`${API_BASE}/api/v1/sessions`);
+                const { sessions = [] } = await res.json();
+                const tracks = [...new Set(
+                    sessions.map(s => s.race_name.replace(/\s+Grand Prix$/, ''))
+                )];
+
+                const sel1 = document.getElementById('driverTrackSelect');
+                const sel2 = document.getElementById('trackSelect');
+
+                // ← clear out whatever’s in there already
+                sel1.innerHTML = '';
+                sel2.innerHTML = '';
+
+                // now build exactly one list
+                tracks.forEach(t => {
+                    const opt1 = new Option(t, t);
+                    const opt2 = new Option(t, t);
+                    sel1.add(opt1);
+                    sel2.add(opt2);
+                });
+            }
             // Event listeners
             document.getElementById('runDriverSimulation').addEventListener('click', runDriverPerformanceSimulation);
             document.getElementById('runSafetyCarPrediction').addEventListener('click', runSafetyCarPrediction);
@@ -1688,6 +1795,7 @@ async def serve_monte_carlo():
             // Initialize
             document.addEventListener('DOMContentLoaded', async function() {
                 console.log('F1 Monte Carlo Dashboard loaded');
+                await populateTrackSelects();
                 await loadDriverData();
                 console.log('Dashboard ready for simulations');
             });
