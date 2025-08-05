@@ -23,6 +23,13 @@
             border: 2px solid #444;
         }
 
+        .footer, .footer a {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 16px;
+            color: #aaa;
+        }
+
         .race-info {
             display: flex;
             justify-content: space-around;
@@ -43,6 +50,10 @@
         .race-info .secondary {
             font-size: 14px;
             color: #aaa;
+        }
+
+        .race-info a {
+            color: #fff;
         }
 
         .container {
@@ -427,11 +438,7 @@
     </div>
     {% endif %}
 
-    {% if data_quality > 0 %}
-    <div class="data-quality">
-        Data Quality: {{ "{:,}".format(data_quality) }} telemetry windows • Perfect fidelity • No sampling applied
-    </div>
-    {% endif %}
+    <div class="footer"><a href="https://www.ischool.berkeley.edu/projects/2025/overtakeai" target="_blank">About the OvertakeAI Project</a></div>
 
     <script>
         // Get telemetry data from Flask backend
@@ -470,10 +477,18 @@
             if (header) {
                 header.innerHTML = `
                     <h1>F1 Safety Car Early Warning System</h1>
-                    <div class="race-info">
+                     <div class="race-info">
+                        <div>
+                            <div class="primary"><a href="https://f1capstone.com/monte-carlo">Monte Carlo Simulations</a></div>
+                            <div class="secondary">Click to view advanced probabilistic analysis with safety car incident prediction</div>
+                        </div>
                         <div>
                             <div class="primary">No Race Selected</div>
-                            <div class="secondary">Choose a race from the dropdown below</div>
+                            <div class="secondary">Choose a race from the dropdown below to view live safety car predictions</div>
+                        </div>
+                        <div>
+                            <div class="primary"><a href="https://f1capstone.com/dashboard">F1 Safety Car Prediction Dashboard</a></div>
+                            <div class="secondary">Real-time F1 data analysis with safety car prediction and external API integration</div>
                         </div>
                     </div>
                 `;
