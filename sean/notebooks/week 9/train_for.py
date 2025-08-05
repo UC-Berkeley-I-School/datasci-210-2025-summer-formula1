@@ -78,15 +78,15 @@ def main():
 
     # 4. Define class weights
     # y_enc = dataset["label_encoder"]
-    # class_weight = {
-    #     y_enc.class_to_idx["green"]: 1.0,
-    #     y_enc.class_to_idx["red"]: 1.0,
-    #     y_enc.class_to_idx["safety_car"]: 5.0,
-    #     y_enc.class_to_idx["unknown"]: 1.0,
-    #     y_enc.class_to_idx["vsc"]: 1.0,
-    #     y_enc.class_to_idx["vsc_ending"]: 1.0,
-    #     y_enc.class_to_idx["yellow"]: 1.0,
-    # }
+    class_weight = {
+        y_enc.class_to_idx["green"]: 1.0,
+        y_enc.class_to_idx["red"]: 1.0,
+        y_enc.class_to_idx["safety_car"]: 5.0,
+        y_enc.class_to_idx["unknown"]: 1.0,
+        y_enc.class_to_idx["vsc"]: 1.0,
+        y_enc.class_to_idx["vsc_ending"]: 1.0,
+        y_enc.class_to_idx["yellow"]: 1.0,
+    }
 
     # 5. Train model
     model_name = "rocket_sc_smote_train_sc_eval_driver1"
@@ -97,8 +97,8 @@ def main():
     # models = create_basic_models()
     # model = models[model_name]
 
-    model = RocketClassifier(n_kernels=1000)
-    # model = RocketClassifier(n_kernels=1000, class_weight=class_weight)
+    # model = RocketClassifier(n_kernels=1000)
+    model = RocketClassifier(n_kernels=1000, class_weight=class_weight)
 
     run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{model_name}"
 

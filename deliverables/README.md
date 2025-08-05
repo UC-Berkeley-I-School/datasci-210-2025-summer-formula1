@@ -193,6 +193,84 @@ All components must agree on data formats:
 - Driver numbers are integers (1-99), abbreviations are uppercase 3-letter codes
 - Session IDs follow the pattern: `{YEAR}_{Race Name}_{Session Type}`
 
+## Monte Carlo Simulation Architecture
+
+The architecture comprises three interconnected Monte Carlo simulation engines, each addressing specific aspects of race prediction and analysis:
+
+### Safety Car Incident Prediction Engine
+The core prediction engine implements methodologies from the MDPI research paper "Application of Monte Carlo Methods to Consider Probabilistic Effects in a Race Simulation for Circuit Motorsport." This engine models probabilistic race events with particular focus on safety car deployments.
+
+The system utilizes a data-driven approach through the TrackIncidentProfile class:
+
+```
+@dataclass
+class TrackIncidentProfile:
+    base_vsc_probability: float      # Per lap base probability
+    base_sc_probability: float       # Per lap base probability  
+    base_red_flag_probability: float # Per lap base probability
+    incident_prone_sections: List[str]
+    weather_sensitivity: float
+    track_type: str
+```
+**Weather Impact Multipliers:**
+- Dry conditions: 1.0× (baseline)
+- Mixed conditions: 1.6× probability
+- Wet conditions: 2.2× probability
+- Storm conditions: 3.5× probability
+
+**Race Phase Multipliers:**
+- Start chaos period: 3.0× increased risk
+- Mid-race stable period: 0.8× reduced risk
+- Final laps: 2.5× increased performance factor
+
+### Driver Performance Monte Carlo Engine
+Following Oracle Red Bull Racing's approach of running "300 million permutations of the race using Monte Carlo methods," the driver performance simulator models individual driver capabilities and race-day performance variations.
+
+```
+def simulate_race(self, weather_variability=0.15, safety_car_prob=0.25):
+    performance_factor = 1 + random.gauss(0, speed_variance / 100)
+    weather_impact = 1 + random.gauss(0, weather_variability)
+    safety_car_impact = random.uniform(0.95, 1.05) if safety_car_occurred else 1.0
+    
+    race_time = base_time - (base_speed * performance_factor * weather_impact * safety_car_impact * 10)
+```
+
+**Simulation Parameters**
+Base driver speeds derived from real F1 telemetry data ensuring realistic performance baselines. Individual driver consistency patterns through performance variance calculations. Weather uncertainty affecting all drivers with unique impact distributions. Safety car impact modeling on race strategies and timing decisions.
+
+### ML-Enhanced Incident Predictor
+This hybrid system combines traditional machine learning algorithms with Monte Carlo uncertainty quantification to provide robust incident predictions.
+Model Architecture
+
+```
+class MLEnhancedIncidentPredictor:
+    def train_models(self, X_train, y_train, X_val, y_val):
+        self.vsc_model = RandomForestClassifier(n_estimators=100, random_state=42)
+        self.sc_model = RandomForestClassifier(n_estimators=100, random_state=42)
+        self.red_flag_model = LogisticRegression(random_state=42)
+```
+
+The system employs specialized models for different incident types, recognizing that Virtual Safety Car, Safety Car, and Red Flag events have distinct probability patterns and triggering conditions.
+
+### Advanced Features and Capabilities
+
+The system maintains individual incident profiles for over 20 F1 circuits, each calibrated with:
+- Circuit-specific weather sensitivity factors (Spa-Francorchamps: 3.0×, Monaco: 2.5×)
+- Identification of incident-prone track sections
+- Historical performance data integration
+
+Real-time probability adjustments based on:
+- Lap-by-lap race progression
+- Championship position effects on driver behavior
+- Evolving weather condition impacts
+- Strategic timing considerations
+
+Following research principles of robust strategy assessment, the system provides:
+- Confidence intervals for all predictions
+- Sensitivity analysis for parameter variations
+- Probabilistic outcome distribution modeling
+- Risk assessment quantification
+
 ## Deployment Strategy: Three-Phase Migration
 
 Our deployment strategy follows a three-phase approach that begins with the simplest possible architecture and progressively adds containerization and orchestration capabilities. This graduated strategy allows us to validate our application logic and data flows before introducing infrastructure complexity, reducing the risk of conflating application issues with deployment challenges.
