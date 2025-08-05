@@ -87,6 +87,7 @@ services:
       dockerfile: Dockerfile
     environment:
       API_BASE_URL: http://f1_model_service:8000
+      MONTE_CARLO_BASE_URL: http://f1_monte_carlo_sim:8001
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       GUNICORN_LOG_LEVEL: ${GUNICORN_LOG_LEVEL:-INFO}
     depends_on:

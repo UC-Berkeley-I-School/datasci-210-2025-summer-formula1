@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify
+from flask import Flask, render_template, request, jsonify, redirect
 from flask_caching import Cache
 from dotenv import load_dotenv
 
@@ -526,6 +526,25 @@ def get_sessions():
     }
     
     return jsonify(sessions_data)
+
+
+@app.route("/monte-carlo")
+def monte_carlo():
+    """Redirect to Monte Carlo simulations service"""
+    monte_carlo_base = os.environ.get("MONTE_CARLO_BASE_URL", "http://localhost:8001")
+    monte_carlo_url = f"{monte_carlo_base}/monte-carlo"
+    logger.info(f"Redirecting to Monte Carlo service: {monte_carlo_url}")
+    return redirect(monte_carlo_url)
+
+
+@app.route("/dashboard")
+def dashboard():
+    """Redirect to F1 Safety Car Prediction Dashboard"""
+    monte_carlo_base = os.environ.get("MONTE_CARLO_BASE_URL", "http://localhost:8001")
+    dashboard_url = f"{monte_carlo_base}/dashboard"
+    logger.info(f"Redirecting to dashboard service: {dashboard_url}")
+    return redirect(dashboard_url)
+
 
 if __name__ == '__main__':
     logger.info("Starting Flask development server on port 5001")

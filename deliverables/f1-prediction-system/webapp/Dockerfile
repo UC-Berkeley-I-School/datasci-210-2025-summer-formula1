@@ -26,6 +26,7 @@ ENV PYTHONPATH=/app
 
 # Default API configuration - should be overridden at runtime
 ENV API_BASE_URL=http://f1_model_service:8000
+ENV MONTE_CARLO_BASE_URL=http://f1_monte_carlo_sim:8001
 
 # Server configuration
 ENV HOST=0.0.0.0
