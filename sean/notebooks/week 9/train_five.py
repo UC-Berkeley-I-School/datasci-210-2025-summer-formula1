@@ -3,7 +3,7 @@
 import argparse
 from datetime import datetime
 from aeon.classification.convolution_based import RocketClassifier
-
+from sklearn.ensemble import RandomForestClassifier
 
 from f1_etl import (
     DataConfig,
@@ -22,13 +22,15 @@ from f1_etl.train import (
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description='Train F1 safety car prediction models')
+    parser = argparse.ArgumentParser(
+        description="Train F1 safety car prediction models"
+    )
     parser.add_argument(
-        '--driver', 
+        "--driver",
         type=str,
-        action='append',
-        dest='drivers',
-        help='Driver number(s) to include in training. Can be specified multiple times.'
+        action="append",
+        dest="drivers",
+        help="Driver number(s) to include in training. Can be specified multiple times.",
     )
     return parser.parse_args()
 
@@ -60,8 +62,9 @@ def main():
         prediction_horizon=100,
         normalize=True,
         target_column="TrackStatus",
-        resampling_strategy="smote",
     )
+
+    X, y, metadata = dataset["X"], dataset["y"], dataset["metadata"]
 
     # 2. Create metadata
     dataset_metadata = create_metadata_from_f1_dataset(
@@ -71,12 +74,80 @@ def main():
     )
 
     # 3. Prepare data
-    splits = prepare_data_with_validation(dataset, val_size=0.0, test_size=0.0)
+    splits = prepare_data_with_validation(dataset, val_size=0.00, test_size=0.30)
     class_names = list(dataset["label_encoder"].class_to_idx.keys())
 
     # 5. Train model
-    model_name = f"rocket_smote_driver{"_".join(drivers)}"
-    model = RocketClassifier(n_kernels=1000)
+
+    # model_name = f"rocket_driver{"_".join(drivers)}"
+    # model = RocketClassifier(n_kernels=1000)
+
+    model_name = f"rocket_rf_driver{'_'.join(drivers)}"
+    model = RocketClassifier(
+        n_kernels=1000,
+        estimator=RandomForestClassifier(
+            n_estimators=100,
+            random_state=42,
+            # class_weight=cls_weight,
+            max_depth=10,
+        ),
+    )
+
+    # model_name = f"catch22_rf_driver{"_".join(drivers)}"
+    # model = Catch22Classifier(
+    #     estimator=RandomForestClassifier(
+    #         n_estimators=100,
+    #         random_state=42,
+    #         # class_weight=cls_weight,
+    #         max_depth=10,
+    #     ),
+    #     outlier_norm=True,
+    #     random_state=42,
+    # )
+
+    # model_name = f"catch22_logistic_driver{"_".join(drivers)}"
+    # model = Catch22Classifier(
+    #     estimator=LogisticRegression(
+    #         random_state=42,
+    #         max_iter=3000,
+    #         # solver='liblinear',
+    #         solver="saga",
+    #         penalty="l1",
+    #         C=0.1,
+    #         # class_weight=cls_weight,
+    #     ),
+    #     outlier_norm=True,
+    #     random_state=42,
+    # )
+
+    # TODO fix for binary classification
+    # model_name = f"catch22_linear_driver{"_".join(drivers)}"
+    # model = Catch22Classifier(
+    #     estimator=LinearRegression(),
+    #     outlier_norm=True,
+    #     random_state=42,
+    # )
+
+    # model_name = f"inceptiontime_driver{'_'.join(drivers)}"
+    # model = InceptionTimeClassifier(
+    #     n_classifiers=5,  # ensemble of 5 models
+    #     depth=6,  # network depth
+    #     n_filters=32,  # number of filters
+    #     n_epochs=100,
+    #     batch_size=16,
+    #     random_state=42,
+    #     verbose=False,
+    # )
+
+    # model_name = f"resnet_driver{'_'.join(drivers)}"
+    # model = ResNetClassifier(
+    #     n_residual_blocks=3,
+    #     n_filters=[128, 256, 128],
+    #     n_epochs=100,
+    #     batch_size=16,
+    #     random_state=42,
+    #     verbose=False
+    # )
 
     run_id = f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{model_name}"
 
