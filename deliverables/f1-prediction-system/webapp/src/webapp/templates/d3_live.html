@@ -23,6 +23,13 @@
             border: 2px solid #444;
         }
 
+        .footer, .footer a {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 16px;
+            color: #aaa;
+        }
+
         .race-info {
             display: flex;
             justify-content: space-around;
@@ -43,6 +50,10 @@
         .race-info .secondary {
             font-size: 14px;
             color: #aaa;
+        }
+
+        .race-info a {
+            color: #fff;
         }
 
         .container {
@@ -169,7 +180,7 @@
         }
 
         .car-dot {
-            r: 6;
+            r: 12;
             stroke: white;
             stroke-width: 2;
         }
@@ -427,11 +438,7 @@
     </div>
     {% endif %}
 
-    {% if data_quality > 0 %}
-    <div class="data-quality">
-        Data Quality: {{ "{:,}".format(data_quality) }} telemetry windows • Perfect fidelity • No sampling applied
-    </div>
-    {% endif %}
+    <div class="footer"><a href="https://www.ischool.berkeley.edu/projects/2025/overtakeai" target="_blank">About the OvertakeAI Project</a></div>
 
     <script>
         // Get telemetry data from Flask backend
@@ -470,10 +477,18 @@
             if (header) {
                 header.innerHTML = `
                     <h1>F1 Safety Car Early Warning System</h1>
-                    <div class="race-info">
+                     <div class="race-info">
+                        <div>
+                            <div class="primary"><a href="https://f1capstone.com/monte-carlo">Monte Carlo Simulations</a></div>
+                            <div class="secondary">Click to view advanced probabilistic analysis with safety car incident prediction</div>
+                        </div>
                         <div>
                             <div class="primary">No Race Selected</div>
-                            <div class="secondary">Choose a race from the dropdown below</div>
+                            <div class="secondary">Choose a race from the dropdown below to view live safety car predictions</div>
+                        </div>
+                        <div>
+                            <div class="primary"><a href="https://f1capstone.com/dashboard">F1 Safety Car Prediction Dashboard</a></div>
+                            <div class="secondary">Real-time F1 data analysis with safety car prediction and external API integration</div>
                         </div>
                     </div>
                 `;
@@ -817,29 +832,100 @@
             updateProgress();
         }
 
-        function detectProbabilitySpike(currentProb) {
-            // Add current probability to history
-            probabilityHistory.push(currentProb);
-            if (probabilityHistory.length > HISTORY_LENGTH) {
-                probabilityHistory.shift();
+        // Helper function to get aggregated probability for warning detection
+        function getCurrentAggregatedProbability(timestep) {
+            if (!probabilities || timestep >= probabilities.length) {
+                return 0;
             }
             
-            // Calculate rate of change
-            if (probabilityHistory.length >= 2) {
-                const recentChange = currentProb - previousProbability;
-                const avgChange = probabilityHistory.length >= HISTORY_LENGTH 
-                    ? (currentProb - probabilityHistory[0]) / HISTORY_LENGTH
-                    : 0;
-                
-                // Detect spikes
-                if (recentChange >= CRITICAL_THRESHOLD || avgChange >= CRITICAL_THRESHOLD) {
-                    return 'critical';
-                } else if (recentChange >= WARNING_THRESHOLD || avgChange >= WARNING_THRESHOLD) {
-                    return 'warning';
+            const currentProbs = probabilities[timestep];
+            
+            if (typeof currentProbs === 'number') {
+                // 1D data: single probability value
+                return currentProbs;
+            } else if (Array.isArray(currentProbs)) {
+                // 2D data: array of probabilities per driver - use maximum for warning detection
+                return Math.max(...currentProbs.filter(p => p !== null && p !== undefined));
+            } else {
+                return 0;
+            }
+        }
+
+        // NEW: Helper function to count high-risk drivers (UPDATED LOGIC)
+        function countHighRiskDrivers(currentTimestep) {
+            // Safety checks
+            if (!probabilities || currentTimestep >= probabilities.length) {
+                return { highRiskCount: 0, criticalRiskCount: 0, maxProb: 0 };
+            }
+            
+            const currentProbs = probabilities[currentTimestep];
+            let driverProbabilities;
+            
+            // Handle both 1D and 2D probability data
+            if (typeof currentProbs === 'number') {
+                // 1D data: single probability value for all drivers
+                driverProbabilities = drivers.map(() => currentProbs);
+            } else if (Array.isArray(currentProbs)) {
+                // 2D data: array of probabilities per driver
+                driverProbabilities = currentProbs.map(prob => prob || 0);
+            } else {
+                return { highRiskCount: 0, criticalRiskCount: 0, maxProb: 0 };
+            }
+            
+            // Count drivers with high probabilities (LESS SENSITIVE THRESHOLDS)
+            let highRiskCount = 0;      // Count drivers > 25% (0.25) - was 10%
+            let criticalRiskCount = 0;  // Count drivers > 75% (0.75) - was 50%
+            let maxProb = Math.max(...driverProbabilities);
+            
+            driverProbabilities.forEach(prob => {
+                const probPercent = prob * 100;
+                if (probPercent > 75) {  // Raised from 50% to 75%
+                    criticalRiskCount++;
+                    highRiskCount++; // Critical is also high risk
+                } else if (probPercent > 25) {  // Raised from 10% to 25%
+                    highRiskCount++;
                 }
+            });
+            
+            return { highRiskCount, criticalRiskCount, maxProb };
+        }
+
+        // UPDATED: New detection logic using driver counts
+        function detectProbabilitySpike(currentProb) {
+            // NEW: Check how many drivers have high risk instead of just max probability
+            const riskStats = countHighRiskDrivers(currentTimestep);
+            
+            // Add current max probability to history for trend analysis
+            probabilityHistory.push(riskStats.maxProb);
+            if (probabilityHistory.length > HISTORY_LENGTH) {
+                probabilityHistory.shift(); // Keep only recent history
             }
             
-            previousProbability = currentProb;
+            // Debug logging (only every 50 timesteps to avoid spam)
+            if (currentTimestep % 50 === 0) {
+                console.log(`Safety Car Warning Check - Timestep ${currentTimestep}:`, {
+                    highRiskDrivers: riskStats.highRiskCount,
+                    criticalRiskDrivers: riskStats.criticalRiskCount,
+                    maxProbability: `${(riskStats.maxProb * 100).toFixed(1)}%`,
+                    warningTriggered: riskStats.highRiskCount > 6 || riskStats.criticalRiskCount > 3
+                });
+            }
+            
+            // LESS SENSITIVE LOGIC: Require more drivers before warning
+            if (riskStats.criticalRiskCount > 3) {  // More than 3 drivers above 75% (was 4 drivers above 50%)
+                return 'critical';
+            } else if (riskStats.highRiskCount > 6) {  // More than 6 drivers above 25% (was 4 drivers above 10%)
+                return 'warning';
+            }
+            
+            // FALLBACK: Much higher thresholds for single driver warnings
+            const maxProbPercent = riskStats.maxProb * 100;
+            if (maxProbPercent > 90) {  // Raised from 80% to 90%
+                return 'critical'; // Single driver extremely high risk
+            } else if (maxProbPercent > 80) {  // Raised from 60% to 80%
+                return 'warning';  // Single driver very high risk
+            }
+            
             return 'normal';
         }
 
@@ -930,7 +1016,7 @@
 
             carEnter.append('circle')
                 .attr('class', 'car-dot')
-                .attr('r', 8)
+                .attr('r', 12)
                 .attr('fill', d => driverColors[d.driver] || '#666');
 
             carEnter.append('text')
@@ -954,13 +1040,15 @@
             cars.exit().remove();
         }
 
+        // UPDATED: Enhanced status panel with new warning logic
         function updateStatusPanel() {
             const currentLap = Math.ceil((currentTimestep / totalTimesteps) * totalLaps);
             const sessionMinutes = Math.floor(currentTimestep / 50); // Assuming ~50 timesteps per minute
             const sessionSeconds = Math.floor((currentTimestep % 50) * 1.2);
             
-            // Get current probability and detect spikes
-            const currentProb = probabilities ? probabilities[currentTimestep] : 0;
+            // Get current probability and detect spikes using new logic
+            const currentProb = getCurrentAggregatedProbability(currentTimestep);
+            const riskStats = countHighRiskDrivers(currentTimestep);
             const warningLevel = detectProbabilitySpike(currentProb);
             
             // Update session time
@@ -991,7 +1079,7 @@
                     statusText = 'Session stopped - red flag conditions';
                 }
                 
-                // Create permanent safety car warning panel that changes based on probability
+                // Create enhanced safety car warning panel with driver count information
                 let safetyCarPanel = '';
                 let safetyCarClass = '';
                 let safetyCarIcon = '';
@@ -1002,18 +1090,24 @@
                     safetyCarClass = 'critical';
                     safetyCarIcon = '🚨';
                     safetyCarTitle = 'CRITICAL: Safety Car Imminent!';
-                    safetyCarText = `Probability spike detected: ${(currentProb * 100).toFixed(3)}%<br><strong>⚠️ High likelihood of safety car deployment</strong>`;
+                    safetyCarText = `<strong>${riskStats.criticalRiskCount > 3 ? riskStats.criticalRiskCount : riskStats.highRiskCount} drivers</strong> showing very high risk (>75%)<br>Max probability: ${(riskStats.maxProb * 100).toFixed(1)}%<br><strong>⚠️ High likelihood of safety car deployment</strong>`;
                 } else if (warningLevel === 'warning') {
                     safetyCarClass = 'warning';
                     safetyCarIcon = '⚠️';
-                    safetyCarTitle = 'WARNING: Increased Safety Car Risk';
-                    safetyCarText = `Rising probability: ${(currentProb * 100).toFixed(3)}%<br>Monitor track conditions closely`;
+                    safetyCarTitle = 'WARNING: Multiple Drivers at Risk';
+                    safetyCarText = `<strong>${riskStats.highRiskCount} drivers</strong> showing elevated risk (>25%)<br>Max probability: ${(riskStats.maxProb * 100).toFixed(1)}%<br>Monitor track conditions closely`;
                 } else {
-                    // Normal state - still show the panel but in green/calm state
+                    // Normal state - show driver risk summary
                     safetyCarClass = '';
                     safetyCarIcon = '📊';
                     safetyCarTitle = 'Safety Car Monitor';
-                    safetyCarText = `Current probability: ${(currentProb * 100).toFixed(3)}%<br>Conditions normal - monitoring ongoing`;
+                    let riskSummary = `Max probability: ${(riskStats.maxProb * 100).toFixed(1)}%`;
+                    if (riskStats.highRiskCount > 0) {
+                        riskSummary += `<br>${riskStats.highRiskCount} driver${riskStats.highRiskCount > 1 ? 's' : ''} above 25% risk`;
+                    } else {
+                        riskSummary += `<br>All drivers below 25% risk - monitoring ongoing`;
+                    }
+                    safetyCarText = riskSummary;
                 }
                 
                 safetyCarPanel = `
@@ -1023,7 +1117,7 @@
                     </div>
                 `;
                 
-                // Update status panel content with permanent safety car section
+                // Update status panel content with enhanced safety car section
                 statusPanel.innerHTML = `
                     ${safetyCarPanel}
                     <div class="status-item" style="border-left-color: ${statusColor}">
