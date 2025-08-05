@@ -60,6 +60,17 @@ def train_and_validate_model(
         print("\nEvaluating on validation set...")
         val_pred = model.predict(splits["X_val"])
 
+        # Extract validation probabilities if available
+        val_pred_proba = None
+        if hasattr(model, "predict_proba"):
+            try:
+                val_pred_proba = model.predict_proba(splits["X_val"])
+                print(
+                    f"Extracted validation probability predictions: {val_pred_proba.shape}"
+                )
+            except Exception as e:
+                print(f"Warning: Could not extract validation probabilities: {e}")
+
         # Quick validation metrics
         val_accuracy = accuracy_score(splits["y_val"], val_pred)
         val_f1_macro = f1_score(
@@ -74,6 +85,9 @@ def train_and_validate_model(
             "accuracy": val_accuracy,
             "f1_macro": val_f1_macro,
             "predictions": val_pred.tolist(),
+            "probabilities": val_pred_proba.tolist()
+            if val_pred_proba is not None
+            else None,
             "y_true": splits["y_val"].tolist(),
         }
     elif validate_during_training and not has_val:
@@ -140,7 +154,7 @@ def evaluate_on_external_dataset(
     evaluator,
     resampling_strategy=None,
     resampling_config=None,
-    original_dataset_config=None
+    original_dataset_config=None,
 ):
     """
     Evaluate a trained model on a completely different dataset (e.g., different race)
@@ -175,15 +189,19 @@ def evaluate_on_external_dataset(
     pca_variance_threshold = 0.95
     normalization_method = "per_sequence"
     if original_dataset_config:
-            feature_transform = original_dataset_config.get("feature_transform", "none")
-            pca_components = original_dataset_config.get("pca_n_components", None)
-            pca_variance_threshold = original_dataset_config.get("pca_variance_threshold", 0.95)
-            normalization_method = original_dataset_config.get("normalization_method", "per_sequence")
-            
-            print(f"Using preprocessing from training dataset:")
-            print(f"  Feature transform: {feature_transform}")
-            if feature_transform == "pca":
-                print(f"  PCA components: {pca_components}")
+        feature_transform = original_dataset_config.get("feature_transform", "none")
+        pca_components = original_dataset_config.get("pca_n_components", None)
+        pca_variance_threshold = original_dataset_config.get(
+            "pca_variance_threshold", 0.95
+        )
+        normalization_method = original_dataset_config.get(
+            "normalization_method", "per_sequence"
+        )
+
+        print(f"Using preprocessing from training dataset:")
+        print(f"  Feature transform: {feature_transform}")
+        if feature_transform == "pca":
+            print(f"  PCA components: {pca_components}")
 
     # Load external dataset with same preprocessing as training
     print("Loading external dataset...")
@@ -238,9 +256,18 @@ def evaluate_on_external_dataset(
     print("Generating predictions...")
     y_pred = trained_model.predict(X_external)
 
+    # Extract probability scores if available
+    y_pred_proba = None
+    if hasattr(trained_model, "predict_proba"):
+        try:
+            y_pred_proba = trained_model.predict_proba(X_external)
+            print(f"Extracted probability predictions: {y_pred_proba.shape}")
+        except Exception as e:
+            print(f"Warning: Could not extract probabilities: {e}")
+
     # Calculate metrics
     metrics = evaluator._calculate_comprehensive_metrics(
-        y_external, y_pred, None, list(class_names), "safety_car"
+        y_external, y_pred, y_pred_proba, list(class_names), "safety_car"
     )
 
     # Create evaluation metadata with unified ID
@@ -267,7 +294,7 @@ def evaluate_on_external_dataset(
         "predictions": {
             "y_true": y_external.tolist(),
             "y_pred": y_pred.tolist(),
-            "y_pred_proba": None,
+            "y_pred_proba": y_pred_proba.tolist() if y_pred_proba is not None else None,
         },
         "class_info": {
             "class_names": list(class_names),
