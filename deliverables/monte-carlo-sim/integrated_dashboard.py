@@ -1,4 +1,16 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.12"
+# dependencies = [
+#     "f1-etl>=0.6.1",
+#     "fastapi",
+#     "fastf1>=3.6.0",
+#     "numpy>=2.2.6",
+#     "pandas",
+#     "psycopg2-binary",
+#     "uvicorn",
+# ]
+# ///
 """
 F1 Prediction Dashboard with Safety Car Monte Carlo Simulation
 """
@@ -1770,7 +1782,7 @@ async def serve_monte_carlo():
                 const res = await fetch(`${API_BASE}/api/v1/sessions`);
                 const { sessions = [] } = await res.json();
                 const tracks = [...new Set(
-                    sessions.map(s => s.race_name.replace(/\s+Grand Prix$/, ''))
+                    sessions.map(s => s.race_name.replace(/\\s+Grand Prix$/, ''))
                 )];
 
                 const sel1 = document.getElementById('driverTrackSelect');

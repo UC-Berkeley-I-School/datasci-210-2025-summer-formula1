@@ -61,6 +61,20 @@ services:
     depends_on:
       - model_service
 
+  monte_carlo_sim:
+    container_name: f1_monte_carlo_sim
+    build:
+      context: ./monte-carlo-sim
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_TYPE: remote
+      EXTERNAL_API_BASE: https://f1capstone.com
+    depends_on:
+      - model_service
+
+
 volumes:
   f1_data:
 
