@@ -194,85 +194,105 @@ def create_safety_car_dataset(
     if feature_transform == "pca":
         logger.info("Applying PCA transformation to telemetry features")
         from sklearn.decomposition import PCA
-        from sklearn.preprocessing import StandardScaler
         from sklearn.impute import SimpleImputer
-        
+        from sklearn.preprocessing import StandardScaler
+
         # Get the features that TimeSeriesGenerator would use
         original_features = ts_generator.features.copy()
-        
+
         # Filter to only include features that exist in the data
-        available_features = [f for f in original_features if f in telemetry_data.columns]
-        
+        available_features = [
+            f for f in original_features if f in telemetry_data.columns
+        ]
+
         # Further filter to only numeric features
         numeric_features = []
         for feature in available_features:
             col_dtype = telemetry_data[feature].dtype
             # Check if column is numeric (int, float) and not timedelta
-            if pd.api.types.is_numeric_dtype(telemetry_data[feature]) and not pd.api.types.is_timedelta64_dtype(telemetry_data[feature]):
+            if pd.api.types.is_numeric_dtype(
+                telemetry_data[feature]
+            ) and not pd.api.types.is_timedelta64_dtype(telemetry_data[feature]):
                 numeric_features.append(feature)
             else:
-                logger.debug(f"Skipping non-numeric feature '{feature}' (dtype: {col_dtype})")
-        
+                logger.debug(
+                    f"Skipping non-numeric feature '{feature}' (dtype: {col_dtype})"
+                )
+
         if not numeric_features:
-            raise ValueError(f"No numeric features found for PCA. Available features: {available_features}")
-        
+            raise ValueError(
+                f"No numeric features found for PCA. Available features: {available_features}"
+            )
+
         original_n_features = len(numeric_features)
-        logger.info(f"Applying PCA to {len(numeric_features)} numeric features: {numeric_features}")
-        
+        logger.info(
+            f"Applying PCA to {len(numeric_features)} numeric features: {numeric_features}"
+        )
+
         # Extract feature data - now guaranteed to be numeric
         X_features = telemetry_data[numeric_features].values
-        
+
         # Convert to float to ensure compatibility
         try:
             X_features = X_features.astype(np.float64)
         except (ValueError, TypeError) as e:
             logger.error(f"Failed to convert features to float: {e}")
-            logger.error(f"Feature dtypes: {[(f, telemetry_data[f].dtype) for f in numeric_features]}")
+            logger.error(
+                f"Feature dtypes: {[(f, telemetry_data[f].dtype) for f in numeric_features]}"
+            )
             raise
-        
+
         # Handle missing values before PCA
         if np.isnan(X_features).any():
             logger.info("Imputing missing values before PCA")
-            imputer = SimpleImputer(strategy='mean')
+            imputer = SimpleImputer(strategy="mean")
             X_features = imputer.fit_transform(X_features)
-        
+
         # Standardize for PCA
         pca_scaler = StandardScaler()
         X_scaled = pca_scaler.fit_transform(X_features)
-        
+
         # Determine number of components
         if pca_components is None:
             pca_temp = PCA()
             pca_temp.fit(X_scaled)
             cumsum = np.cumsum(pca_temp.explained_variance_ratio_)
             n_components = np.argmax(cumsum >= pca_variance_threshold) + 1
-            logger.info(f"Using {n_components} components to capture {pca_variance_threshold*100}% variance")
+            logger.info(
+                f"Using {n_components} components to capture {pca_variance_threshold * 100}% variance"
+            )
         else:
             n_components = min(pca_components, len(numeric_features))
             logger.info(f"Using {n_components} components (user specified)")
-        
+
         # Apply PCA
         pca_transformer = PCA(n_components=n_components)
         X_pca = pca_transformer.fit_transform(X_scaled)
-        
-        logger.info(f"PCA reduced features from {len(numeric_features)} to {n_components}")
-        logger.info(f"Explained variance ratio: {pca_transformer.explained_variance_ratio_}")
-        logger.info(f"Cumulative variance: {np.cumsum(pca_transformer.explained_variance_ratio_)}")
-        
+
+        logger.info(
+            f"PCA reduced features from {len(numeric_features)} to {n_components}"
+        )
+        logger.info(
+            f"Explained variance ratio: {pca_transformer.explained_variance_ratio_}"
+        )
+        logger.info(
+            f"Cumulative variance: {np.cumsum(pca_transformer.explained_variance_ratio_)}"
+        )
+
         # Replace original features with PCA components
         telemetry_data = telemetry_data.drop(columns=numeric_features)
-        
+
         # Add PCA components as new columns
-        pca_feature_names = [f'PC{i+1}' for i in range(n_components)]
+        pca_feature_names = [f"PC{i + 1}" for i in range(n_components)]
         for i, col_name in enumerate(pca_feature_names):
             telemetry_data[col_name] = X_pca[:, i]
-        
+
         # Update TimeSeriesGenerator to use PCA features
         ts_generator.features = pca_feature_names
-        
+
         # Store the numeric features that were actually used
         original_features = numeric_features
-        
+
         logger.info(f"Updated features for windowing: {pca_feature_names}")
 
     # Step 4: Generate time series sequences (with PCA features if enabled)
