@@ -214,3 +214,12 @@ def get_telemetry(session_id: str = Query(...)) -> TelemetryResponse:
     if not coordinates:
         raise HTTPException(status_code=404, detail="Telemetry not found")
     return TelemetryResponse(coordinates=coordinates)
+
+
+@router.get("/health", response_model=dict)
+def health_check() -> dict:
+    """
+    Simple health check endpoint to verify the service is running.
+    Returns a JSON response with a status message.
+    """
+    return {"status": "ok", "message": "Model service is healthy"}
