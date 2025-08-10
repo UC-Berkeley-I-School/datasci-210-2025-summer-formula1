@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: webapp-config
+  namespace: f1
+data:
+  LOG_LEVEL: "INFO"
+  GUNICORN_LOG_LEVEL: "INFO"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: model-service-config
+  namespace: f1
+data:
+  POSTGRES_DB: "f1_telemetry"
+  POSTGRES_USER: "f1_user"
+  POSTGRES_HOST: "db"           # Cluster service name for Postgres
+  POSTGRES_PORT: "5432"
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: monte-carlo-config
+  namespace: f1
+data:
+  DATABASE_TYPE: "remote"
+  EXTERNAL_API_BASE: "https://example.com"
