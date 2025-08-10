@@ -28,24 +28,64 @@ spec:
       labels:
         app: model-service
     spec:
+      volumes:
+        - name: models
+          emptyDir: {}  # Temporary storage for model files
       # Init container pulls models from object storage into an EmptyDir
       initContainers:
-        - name: fetch-models
-          image: curlimages/curl:8.15.0
-          command: ["sh", "-c"]
-          # Example: download a tarball of pickle files from S3/MinIO and extract
-          args:
-            - >
-              set -eux;
-              mkdir -p /models;
-              curl -L "$MODEL_ARCHIVE_URL" -o /tmp/models.tar.gz;
-              tar -xzf /tmp/models.tar.gz -C /models;
-          env:
-            - name: MODEL_ARCHIVE_URL
-              value: "https://storage.example.com/f1/models.tar.gz"
-          volumeMounts:
-            - name: models
-              mountPath: /models
+      - name: fetch-models
+        image: alpine:3.20
+        env:
+          # REQUIRED: your S3 (or any HTTP/HTTPS) URL to the zip
+          - name: MODELS_ZIP_URL
+            value: "https://f1models.s3.us-east-1.amazonaws.com/models.zip"
+          # OPTIONAL: provide a SHA256 to verify integrity (recommended)
+          # echo "<sha256>  /work/models.zip" | sha256sum -c -
+          - name: MODELS_ZIP_SHA256
+            value: ""   # e.g., "2b7e151628aed2a6abf7158809cf4f3c..."
+          # OPTIONAL: name of the top-level dir inside the zip; we'll copy its *contents*
+          - name: ZIP_TOP_DIR
+            value: "models"
+        command: ["sh", "-c"]
+        args:
+          - |
+            set -euo pipefail
+            apk add --no-cache curl unzip ca-certificates rsync
+
+            mkdir -p /work /models
+            echo "Downloading $MODELS_ZIP_URL ..."
+            # robust download with retries & fail on any error
+            curl -fL --retry 5 --retry-all-errors --connect-timeout 10 \
+              -o /work/models.zip "$MODELS_ZIP_URL"
+
+            if [ -n "${MODELS_ZIP_SHA256:-}" ]; then
+              echo "${MODELS_ZIP_SHA256}  /work/models.zip" | sha256sum -c -
+            fi
+
+            echo "Unzipping..."
+            unzip -q /work/models.zip -d /work
+
+            SRC="/work"
+            if [ -n "${ZIP_TOP_DIR:-}" ] && [ -d "/work/${ZIP_TOP_DIR}" ]; then
+              SRC="/work/${ZIP_TOP_DIR}"
+            elif [ -d "/work/models" ]; then
+              SRC="/work/models"
+            fi
+
+            echo "Syncing contents of ${SRC} -> /models ..."
+            rsync -a --delete "${SRC}/" /models/
+
+            echo "Sample of what was staged:"
+            for d in /models/*/; do basename "$d"; done | sort | head -20
+        volumeMounts:
+          - name: models
+            mountPath: /models
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65532
+          runAsGroup: 65532
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
       containers:
         - name: app
           image: 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/model_service:latest
@@ -69,6 +109,11 @@ spec:
             - name: models
               mountPath: /app/models
               readOnly: true
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
       volumes:
         - name: models
           emptyDir: {}
