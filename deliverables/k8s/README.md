@@ -45,7 +45,7 @@ aws ecr create-repository --repository-name f1/model_service
 aws ecr get-login-password --region us-east-1 \
  | docker login --username AWS --password-stdin 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/model_service
 
- docker tag deliverables-model_service:latest 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/model_service:latest
+docker tag deliverables-model_service:latest 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/model_service:latest
 
 docker push 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/model_service:latest
 ```
@@ -80,4 +80,13 @@ aws ecr get-login-password --region us-east-1 \
  docker tag deliverables-nginx:latest 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/nginx:latest
 
 docker push 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/nginx:latest
+```
+
+## Add Models to S3
+
+Create an S3 bucket named `f1models` in the `us-east-1` region and make sure it's publicly accessible. Upload your model files (e.g., `models.zip`) to the bucket.
+
+e.g., 
+```
+https://f1models.s3.us-east-1.amazonaws.com/models.zip
 ```

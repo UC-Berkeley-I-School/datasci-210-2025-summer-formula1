@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: monte-carlo-sim
+  namespace: f1
+spec:
+  selector:
+    app: monte-carlo-sim
+  ports:
+    - name: http
+      port: 8001
+      targetPort: 8001
+  type: ClusterIP
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: monte-carlo-sim
+  namespace: f1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: monte-carlo-sim
+  template:
+    metadata:
+      labels:
+        app: monte-carlo-sim
+    spec:
+      containers:
+        - name: app
+          image: 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/monte_carlo_sim:latest
+          ports:
+            - containerPort: 8001
+          envFrom:
+            - configMapRef: { name: monte-carlo-config }
+          readinessProbe:
+            httpGet: { path: "/healthz", port: 8001 }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: "/healthz", port: 8001 }
+            initialDelaySeconds: 20
+            periodSeconds: 10
