@@ -6,6 +6,7 @@
     <title>OvertakeAI - F1 Safety Car Early Warning System ({{ race_year }} {{ race_name }})</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <style>
+
         body {
             margin: 0;
             padding: 20px;
@@ -21,6 +22,11 @@
             padding: 20px;
             border-radius: 10px;
             border: 2px solid #444;
+        }
+
+        .image-holder img {
+            height: auto;
+            width: min(40rem, 100%)
         }
 
         .footer, .footer a {
@@ -41,6 +47,7 @@
             justify-content: space-around;
             align-items: center;
             margin: 10px 0;
+            gap: 1rem;
         }
 
         .race-info div {
@@ -153,6 +160,7 @@
 
         .bar-chart {
             height: 100%;
+            min-height: 300px;
         }
 
         .bar {
@@ -169,8 +177,63 @@
             fill: white;
         }
 
+        /* Responsive improvements for bar chart */
+        @media (max-width: 480px) {
+            .chart-container {
+                padding: 10px;
+            }
+            
+            .bar-chart {
+                min-height: 250px;
+            }
+            
+            .chart-title {
+                font-size: 14px;
+                margin-bottom: 10px;
+            }
+            
+            .bar-label {
+                font-size: 10px;
+            }
+            
+            .bar-value {
+                font-size: 9px;
+            }
+        }
+
+        @media (max-width: 320px) {
+            .bar-chart {
+                min-height: 200px;
+            }
+            
+            .chart-title {
+                font-size: 12px;
+            }
+            
+            .bar-label {
+                font-size: 8px;
+            }
+            
+            .bar-value {
+                font-size: 8px;
+            }
+        }
+
         .track-map {
             height: 100%;
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Track map responsive styles */
+        @media (max-width: 600px) {
+            .track-map {
+                min-height: 150px;
+                background: rgba(45, 45, 45, 0.3);
+                border-radius: 8px;
+            }
         }
 
         .track-outline {
@@ -263,12 +326,10 @@
         }
 
         .speed-slider {
-            width: 200px;
             margin: 0 10px;
         }
 
         .timeline-slider {
-            width: 300px;
             margin: 0 10px;
         }
 
@@ -344,10 +405,37 @@
             color: #ffa500;
             font-style: italic;
         }
+        @media (max-width: 1024px) {
+            .controls {
+                flex-direction: column;
+            }
+        }
+        @media (max-width: 768px) {
+            .race-info {
+                flex-direction: column;
+            }
+            .race-selector {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+                #raceSelect {
+                margin: 1rem;
+                }
+            }
+            .container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (min-width: 768px) and (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
     </style>
 </head>
 <body>
-    <div style="margin-left:30px;"><img src="{{ url_for('static', filename='images/overtakeai.png') }}" alt="Logo" style="height: 100px;"></div>
+    <div class="image-holder"><img src="{{ url_for('static', filename='images/overtakeai.png') }}" alt="Logo"></div>
     
     <div class="header">
         {% if race_name and race_year %}
@@ -416,7 +504,7 @@
         </div>
         
         <div class="chart-container">
-            <div class="chart-title">Live Track Position - {{ race_name }}</div>
+            <div class="chart-title" id="trackMapTitle">Live Track Position - {{ race_name }}</div>
             <div id="trackMap" class="track-map"></div>
         </div>
         
@@ -736,7 +824,18 @@
         function initBarChart() {
             const container = d3.select('#barChart');
             const containerRect = container.node().getBoundingClientRect();
-            const margin = { top: 20, right: 80, bottom: 30, left: 60 };
+            
+            // Responsive margins based on screen size
+            const isSmallScreen = window.innerWidth < 480;
+            const isVerySmallScreen = window.innerWidth < 320;
+            
+            const margin = {
+                top: isVerySmallScreen ? 15 : (isSmallScreen ? 18 : 20),
+                right: isVerySmallScreen ? 40 : (isSmallScreen ? 60 : 80),
+                bottom: isVerySmallScreen ? 20 : (isSmallScreen ? 25 : 30),
+                left: isVerySmallScreen ? 35 : (isSmallScreen ? 45 : 60)
+            };
+            
             const width = containerRect.width - margin.left - margin.right;
             const height = containerRect.height - margin.top - margin.bottom;
 
@@ -757,20 +856,33 @@
                 .range([0, height])
                 .padding(0.1);
 
+            // Responsive axis tick count and font size
+            const xAxisTicks = isVerySmallScreen ? 3 : (isSmallScreen ? 4 : 5);
+            const axisFontSize = isVerySmallScreen ? '8px' : (isSmallScreen ? '9px' : '11px');
+            
             // Axes
             g.append('g')
                 .attr('class', 'x-axis')
                 .attr('transform', `translate(0,${height})`)
-                .call(d3.axisBottom(xScale).ticks(5))
+                .call(d3.axisBottom(xScale).ticks(xAxisTicks))
                 .selectAll('text')
-                .style('fill', 'white');
+                .style('fill', 'white')
+                .style('font-size', axisFontSize);
 
             g.append('g')
                 .attr('class', 'y-axis')
                 .call(d3.axisLeft(yScale))
                 .selectAll('text')
                 .style('fill', 'white')
-                .style('font-weight', 'bold');
+                .style('font-weight', 'bold')
+                .style('font-size', axisFontSize)
+                .text(d => {
+                    // On very small screens, ensure driver names fit
+                    if (isVerySmallScreen && d.length > 3) {
+                        return d.substring(0, 3);
+                    }
+                    return d;
+                });
 
             // Store scales for updates
             container.datum({ svg, g, xScale, yScale, width, height });
@@ -779,6 +891,69 @@
         function initTrackMap() {
             const container = d3.select('#trackMap');
             const containerRect = container.node().getBoundingClientRect();
+            
+            // Check if screen is too small for track map
+            const isScreenTooSmall = window.innerWidth < 600 || containerRect.width < 300;
+            
+            if (isScreenTooSmall) {
+                // Update title for small screen
+                const titleElement = document.getElementById('trackMapTitle');
+                if (titleElement) {
+                    titleElement.textContent = 'Track Map - View on Desktop';
+                }
+                
+                // Show message instead of track map on small screens
+                const svg = container.append('svg')
+                    .attr('width', containerRect.width)
+                    .attr('height', containerRect.height);
+
+                const g = svg.append('g');
+                
+                // Background rectangle for better visibility
+                g.append('rect')
+                    .attr('width', containerRect.width)
+                    .attr('height', containerRect.height)
+                    .attr('fill', 'rgba(45, 45, 45, 0.8)')
+                    .attr('stroke', '#444')
+                    .attr('stroke-width', 2)
+                    .attr('rx', 10);
+
+                // Icon
+                g.append('text')
+                    .attr('x', containerRect.width / 2)
+                    .attr('y', containerRect.height / 2 - 30)
+                    .attr('text-anchor', 'middle')
+                    .attr('dominant-baseline', 'middle')
+                    .style('font-size', '40px')
+                    .style('fill', '#666')
+                    .text('🗺️');
+
+                // Main message
+                g.append('text')
+                    .attr('x', containerRect.width / 2)
+                    .attr('y', containerRect.height / 2 + 10)
+                    .attr('text-anchor', 'middle')
+                    .attr('dominant-baseline', 'middle')
+                    .style('font-size', '14px')
+                    .style('font-weight', 'bold')
+                    .style('fill', '#aaa')
+                    .text('Track Map');
+
+                // Subtitle message
+                g.append('text')
+                    .attr('x', containerRect.width / 2)
+                    .attr('y', containerRect.height / 2 + 30)
+                    .attr('text-anchor', 'middle')
+                    .attr('dominant-baseline', 'middle')
+                    .style('font-size', '12px')
+                    .style('fill', '#777')
+                    .text('Not available on small screens');
+
+                // Store empty state info for updates
+                container.datum({ isSmallScreen: true });
+                return;
+            }
+            
             const margin = 20;
             const width = containerRect.width - 2 * margin;
             const height = containerRect.height - 2 * margin;
@@ -884,7 +1059,7 @@
             }
 
             // Store scales and dimensions for updates
-            container.datum({ svg, g, width, height, xScale, yScale });
+            container.datum({ svg, g, width, height, xScale, yScale, isSmallScreen: false });
         }
 
         function updateVisualization() {
@@ -995,6 +1170,11 @@
             const container = d3.select('#barChart');
             const { g, xScale, yScale } = container.datum();
             
+            // Responsive font sizing for bar values
+            const isSmallScreen = window.innerWidth < 480;
+            const isVerySmallScreen = window.innerWidth < 320;
+            const barValueFontSize = isVerySmallScreen ? '8px' : (isSmallScreen ? '9px' : '11px');
+            
             // Create synthetic probability data for each driver
             const currentProb = probabilities && currentTimestep < probabilities.length 
                 ? probabilities[currentTimestep] * 100 
@@ -1032,7 +1212,9 @@
                 .attr('class', 'bar-value')
                 .attr('y', d => yScale(d.driver) + yScale.bandwidth() / 2)
                 .attr('x', 5)
-                .style('dominant-baseline', 'middle');
+                .style('dominant-baseline', 'middle')
+                .style('font-size', barValueFontSize)
+                .style('fill', 'white');
 
             // Update all bars
             const barUpdate = barEnter.merge(bars);
@@ -1047,12 +1229,21 @@
                 .transition()
                 .duration(200)
                 .attr('x', d => xScale(d.value) + 5)
-                .text(d => `${d.value.toFixed(1)}%`);
+                .text(d => `${d.value.toFixed(1)}%`)
+                .style('font-size', barValueFontSize);
         }
 
         function updateTrackMap() {
             const container = d3.select('#trackMap');
-            const { g, xScale, yScale } = container.datum();
+            const containerData = container.datum();
+            
+            // Check if we're in small screen mode
+            if (containerData && containerData.isSmallScreen) {
+                // No updates needed for small screen message
+                return;
+            }
+            
+            const { g, xScale, yScale } = containerData;
             
             // Add safety checks
             if (!trackData || !trackData.carPositions || currentTimestep >= trackData.carPositions.length) {
@@ -1439,14 +1630,27 @@
             updateTimelineLabel();
         }
 
-        // Handle window resize
+        // Handle window resize with debouncing for better performance
+        let resizeTimeout;
         window.addEventListener('resize', () => {
-            // Reinitialize charts on resize
-            d3.select('#barChart').selectAll('*').remove();
-            d3.select('#trackMap').selectAll('*').remove();
-            initBarChart();
-            initTrackMap();
-            updateVisualization();
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                // Only reinitialize if we have valid data
+                if (hasValidData) {
+                    console.log('Reinitializing charts for responsive design...');
+                    
+                    // Clear existing charts
+                    d3.select('#barChart').selectAll('*').remove();
+                    d3.select('#trackMap').selectAll('*').remove();
+                    
+                    // Reinitialize with responsive sizing
+                    initBarChart();
+                    initTrackMap();
+                    updateVisualization();
+                    
+                    console.log('Charts reinitialized for screen size:', window.innerWidth + 'x' + window.innerHeight);
+                }
+            }, 250); // 250ms debounce delay
         });
     </script>
 </body>
