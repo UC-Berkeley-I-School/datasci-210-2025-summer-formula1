@@ -24,10 +24,16 @@
         }
 
         .footer, .footer a {
+            clear: both;    
+            display: block; 
             text-align: center;
-            margin-top: 20px;
+            margin-top: 30px;
+            padding: 20px 0;
             font-size: 16px;
             color: #aaa;
+            border-top: 1px solid #444;
+            position: relative; 
+            z-index: 1; 
         }
 
         .race-info {
@@ -60,7 +66,7 @@
             display: grid;
             grid-template-columns: 2fr 2fr 1fr;
             grid-gap: 20px;
-            height: 80vh;
+            min-height: 80vh;
         }
 
         .chart-container {
@@ -169,10 +175,17 @@
 
         .track-outline {
             fill: none;
-            stroke: #00FF00;
+            stroke: #00ff00;
             stroke-width: 4;
             stroke-dasharray: none;
             opacity: 0.8;
+        }
+
+        .track-outline-thick,
+        .track-outline-inner,
+        .track-outline-center {
+            stroke-linecap: round;
+            stroke-linejoin: round;
         }
 
         .car {
@@ -815,11 +828,60 @@
                 .y(d => yScale(d.y))
                 .curve(d3.curveCardinal);
 
-            // Draw track outline
-            g.append('path')
-                .datum(trackData.trackPoints)
-                .attr('class', 'track-outline')
-                .attr('d', line);
+            // COMPOSITE TRACK OUTLINE: Create thick outline from all track data
+            function createCompositeTrackOutline() {
+                // Draw main track with very thick stroke that encompasses all variations
+                g.append('path')
+                    .datum(trackData.trackPoints)
+                    .attr('class', 'track-outline-thick')
+                    .attr('d', line)
+                    .style('fill', 'none')
+                    .style('stroke', '#00ff00')
+                    .style('stroke-width', '12')  // Very thick to cover all variations
+                    .style('opacity', '0.3')
+                    .style('stroke-linecap', 'round')
+                    .style('stroke-linejoin', 'round');
+                
+                // Add inner darker line for definition
+                g.append('path')
+                    .datum(trackData.trackPoints)
+                    .attr('class', 'track-outline-inner')
+                    .attr('d', line)
+                    .style('fill', 'none')
+                    .style('stroke', '#00aa00')
+                    .style('stroke-width', '6')  // Medium thickness
+                    .style('opacity', '0.6')
+                    .style('stroke-linecap', 'round')
+                    .style('stroke-linejoin', 'round');
+                
+                // Centerline removed - no more white lines
+            }
+            
+            // Create the composite track outline
+            createCompositeTrackOutline();
+
+            // Add track direction indicators with the new composite style
+            if (trackData.trackPoints.length > 10) {
+                const midPoint = Math.floor(trackData.trackPoints.length / 2);
+                const startPoint = trackData.trackPoints[midPoint];
+                const endPoint = trackData.trackPoints[midPoint + 1];
+                
+                if (startPoint && endPoint) {
+                    // Calculate arrow direction
+                    const dx = endPoint.x - startPoint.x;
+                    const dy = endPoint.y - startPoint.y;
+                    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                    
+                    // Larger, more visible arrow for thick track
+                    g.append('polygon')
+                        .attr('points', '0,-5 12,0 0,5')  // Bigger arrow
+                        .attr('fill', '#00ff00')
+                        .attr('stroke', '#00ff00')
+                        .attr('stroke-width', '2')
+                        .attr('opacity', 0.9)
+                        .attr('transform', `translate(${xScale(startPoint.x)},${yScale(startPoint.y)}) rotate(${angle})`);
+                }
+            }
 
             // Store scales and dimensions for updates
             container.datum({ svg, g, width, height, xScale, yScale });
