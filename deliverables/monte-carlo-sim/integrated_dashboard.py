@@ -511,7 +511,7 @@ class DriverPerformanceSimulator:
 
 # Configuration - use Remote API by default
 DATABASE_TYPE = os.getenv('DATABASE_TYPE', 'remote')
-EXTERNAL_API_BASE = "https://f1capstone.com"
+EXTERNAL_API_BASE = os.getenv('EXTERNAL_API_BASE', 'https://f1capstone.com')
 
 class F1DatabaseAPI:
     def __init__(self):
