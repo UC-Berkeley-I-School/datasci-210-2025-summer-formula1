@@ -1,7 +1,7 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: f1-ingress
+  name: f1-ingress-staging
   namespace: f1
   annotations:
     kubernetes.io/ingress.class: nginx
@@ -10,10 +10,10 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: "120"
 spec:
   tls:
-    - hosts: ["f1capstone.com"]
-      secretName: tls-f1capstone-com
+    - hosts: ["k8s.f1capstone.com"]
+      secretName: tls-k8s-f1capstone-com
   rules:
-    - host: f1capstone.com
+    - host: k8s.f1capstone.com
       http:
         paths:
           - path: /

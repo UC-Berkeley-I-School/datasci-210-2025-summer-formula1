@@ -36,10 +36,10 @@ spec:
           envFrom:
             - configMapRef: { name: monte-carlo-config }
           readinessProbe:
-            httpGet: { path: "/healthz", port: 8001 }
+            httpGet: { path: "/health", port: 8001 }
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
-            httpGet: { path: "/healthz", port: 8001 }
+            httpGet: { path: "/health", port: 8001 }
             initialDelaySeconds: 20
             periodSeconds: 10

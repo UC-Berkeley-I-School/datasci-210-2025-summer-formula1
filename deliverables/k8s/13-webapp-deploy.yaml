@@ -32,7 +32,7 @@ spec:
         - name: app
           image: 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/webapp:latest
           ports:
-            - containerPort: 8000
+            - containerPort: 5000
           envFrom:
             - configMapRef: { name: webapp-config }
           env:
@@ -41,10 +41,10 @@ spec:
             - name: MONTE_CARLO_BASE_URL
               value: "http://monte-carlo-sim:8001"      # from compose intent
           readinessProbe:
-            httpGet: { path: "/health", port: 5000 }
+            httpGet: { path: "/", port: 5000 }
             initialDelaySeconds: 5
             periodSeconds: 5
           livenessProbe:
-            httpGet: { path: "/health", port: 5000 }
+            httpGet: { path: "/", port: 5000 }
             initialDelaySeconds: 20
             periodSeconds: 10

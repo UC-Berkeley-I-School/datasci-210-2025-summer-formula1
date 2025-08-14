@@ -22,19 +22,22 @@ spec:
   serviceName: db
   replicas: 1
   selector:
-    matchLabels:
-      app: db
+    matchLabels: { app: db }
   template:
     metadata:
-      labels:
-        app: db
+      labels: { app: db }
     spec:
+      securityContext:
+        fsGroup: 999
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: db
           image: 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/database:latest
           ports:
             - containerPort: 5432
           env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata   # <-- use a subdir
             - name: POSTGRES_DB
               valueFrom:
                 configMapKeyRef: { name: model-service-config, key: POSTGRES_DB }
@@ -44,24 +47,13 @@ spec:
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef: { name: db-secrets, key: POSTGRES_PASSWORD }
-          readinessProbe:
-            exec:
-              command: ["sh", "-c", "pg_isready -U f1_user -d f1_telemetry"]
-            initialDelaySeconds: 10
-            periodSeconds: 5
-          livenessProbe:
-            exec:
-              command: ["sh", "-c", "pg_isready -U f1_user -d f1_telemetry"]
-            initialDelaySeconds: 30
-            periodSeconds: 10
           volumeMounts:
             - name: data
-              mountPath: /var/lib/postgresql/data
+              mountPath: /var/lib/postgresql/data        # keep mount at parent
   volumeClaimTemplates:
-    - metadata:
-        name: data
+    - metadata: { name: data }
       spec:
         accessModes: ["ReadWriteOnce"]
         resources:
-          requests:
-            storage: 20Gi
+          requests: { storage: 20Gi }
+        
