@@ -16,15 +16,43 @@ spec:
     - host: k8s.f1capstone.com
       http:
         paths:
-          - path: /
+          # Most specific Monte Carlo API routes first
+          - path: /api/monte-carlo-data
             pathType: Prefix
             backend:
-              service: { name: webapp, port: { number: 5000 } }
+              service: { name: monte-carlo-sim, port: { number: 8001 } }
+          - path: /api/driver-performance
+            pathType: Prefix
+            backend:
+              service: { name: monte-carlo-sim, port: { number: 8001 } }
+          - path: /api/safety-car-prediction
+            pathType: Prefix
+            backend:
+              service: { name: monte-carlo-sim, port: { number: 8001 } }
+          # Generic API routes (must come after specific API routes)
           - path: /api
             pathType: Prefix
             backend:
               service: { name: model-service, port: { number: 8000 } }
+          # Monte Carlo specific routes
           - path: /monte-carlo
             pathType: Prefix
             backend:
               service: { name: monte-carlo-sim, port: { number: 8001 } }
+          - path: /dashboard
+            pathType: Prefix
+            backend:
+              service: { name: monte-carlo-sim, port: { number: 8001 } }
+          - path: /docs
+            pathType: Prefix
+            backend:
+              service: { name: monte-carlo-sim, port: { number: 8001 } }
+          - path: /health
+            pathType: Prefix
+            backend:
+              service: { name: monte-carlo-sim, port: { number: 8001 } }
+          # Main webapp (fallback - must be last)
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: webapp, port: { number: 5000 } }
