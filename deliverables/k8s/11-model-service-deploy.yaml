@@ -19,6 +19,9 @@ metadata:
   name: model-service
   namespace: f1
 spec:
+  revisionHistoryLimit: 0
+  strategy:
+    type: Recreate
   replicas: 2
   selector:
     matchLabels:
@@ -28,27 +31,58 @@ spec:
       labels:
         app: model-service
     spec:
+      volumes:
+        - name: models
+          emptyDir: {}  # Temporary storage for model files
       # Init container pulls models from object storage into an EmptyDir
       initContainers:
         - name: fetch-models
-          image: curlimages/curl:8.15.0
-          command: ["sh", "-c"]
-          # Example: download a tarball of pickle files from S3/MinIO and extract
-          args:
-            - >
-              set -eux;
-              mkdir -p /models;
-              curl -L "$MODEL_ARCHIVE_URL" -o /tmp/models.tar.gz;
-              tar -xzf /tmp/models.tar.gz -C /models;
+          image: python:3.12-alpine
+          imagePullPolicy: IfNotPresent
+          securityContext:
+            runAsUser: 0
+            runAsGroup: 0
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
           env:
-            - name: MODEL_ARCHIVE_URL
-              value: "https://storage.example.com/f1/models.tar.gz"
+            - name: MODELS_ZIP_URL
+              value: "https://f1models.s3.us-east-1.amazonaws.com/models.zip"
+            - name: ZIP_TOP_DIR
+              value: "models"
+          command: ["sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              mkdir -p /work /models
+              python - <<'PY'
+              import os, urllib.request, zipfile, shutil
+              url = os.environ['MODELS_ZIP_URL']
+              dst = '/work/models.zip'
+              print(f"Downloading {url} -> {dst}", flush=True)
+              with urllib.request.urlopen(url) as r, open(dst, 'wb') as f:
+                  f.write(r.read())
+              print("Unzipping...", flush=True)
+              with zipfile.ZipFile(dst) as z:
+                  z.extractall('/work')
+              top = os.environ.get('ZIP_TOP_DIR', 'models')
+              src = f'/work/{top}' if os.path.isdir(f'/work/{top}') else '/work/models'
+              os.makedirs('/models', exist_ok=True)
+              for name in os.listdir(src):
+                  s = os.path.join(src, name)
+                  d = os.path.join('/models', name)
+                  if os.path.isdir(s):
+                      shutil.copytree(s, d, dirs_exist_ok=True)
+                  else:
+                      shutil.copy2(s, d)
+              print("Model staging complete.", flush=True)
+              PY
           volumeMounts:
             - name: models
               mountPath: /models
       containers:
         - name: app
           image: 590184119443.dkr.ecr.us-east-1.amazonaws.com/f1/model_service:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           envFrom:
@@ -69,6 +103,12 @@ spec:
             - name: models
               mountPath: /app/models
               readOnly: true
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
       volumes:
         - name: models
           emptyDir: {}
+
